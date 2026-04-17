@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TileKick - Sala de espera</title>
+    <link rel="stylesheet" href="/styles/index.css">
+</head>
+
+<body>
+    <div id="layout">
+
+        <!-- Barra lateral -->
+        <nav id="sidebar">
+            <div id="sidebar-header">
+                <h2>TileKick</h2>
+            </div>
+            <ul id="sidebar-nav">
+                <li><a href="/dashboard">Inicio</a></li>
+                <li><a href="/game/menu">Jugar</a></li>
+                <li><a href="/leaderboard">Clasificación</a></li>
+                <li><a href="/profile">Perfil</a></li>
+                <li><a href="/settings">Configuración</a></li>
+            </ul>
+            <div id="sidebar-footer">
+                <a href="/logout" id="logout-btn">Cerrar sesión</a>
+            </div>
+        </nav>
+
+        <!-- Contenido principal -->
+        <main id="content">
+            <h1>Sala de espera</h1>
+            <p>Buscando partida con tus parámetros...</p>
+
+            <section id="match-info">
+                <h2>Parámetros de la partida</h2>
+                <ul>
+                    <li><strong>Modo:</strong> <span id="info-mode">—</span></li>
+                    <li><strong>Mapa:</strong> <span id="info-map">—</span></li>
+                    <li><strong>Tipo:</strong> <span id="info-gameType">—</span></li>
+                </ul>
+            </section>
+
+            <section id="waiting-status">
+                <p id="status-msg">Conectando con el servidor...</p>
+                <p>Jugadores en la sala: <span id="player-count">1 / 2</span></p>
+            </section>
+
+            <a href="/game/menu" id="cancel-btn">Cancelar búsqueda</a>
+        </main>
+
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Leer parámetros de la URL
+        const params  = new URLSearchParams(window.location.search);
+        const mode     = params.get('mode')     || '—';
+        const map      = params.get('map')      || '—';
+        const gameType = params.get('gameType') || '—';
+
+        const modeLabels = {
+            online: 'Multijugador online',
+            local:  'Multijugador local',
+            ai:     'Contra la IA',
+        };
+        const mapLabels = {
+            estadio_clasico: 'Estadio clásico',
+            arena_nocturna:  'Arena nocturna',
+            campo_playa:     'Campo de playa',
+            aleatorio:       'Aleatorio',
+        };
+
+        document.getElementById('info-mode').textContent     = modeLabels[mode]     || mode;
+        document.getElementById('info-map').textContent      = mapLabels[map]        || map;
+        document.getElementById('info-gameType').textContent = gameType.toUpperCase();
+
+        // Socket.io — sala de espera
+        const socket = io();
+
+        socket.emit('join-waiting-room', { mode, map, gameType });
+
+        socket.on('waiting', (data) => {
+            document.getElementById('status-msg').textContent = 'Buscando oponente...';
+            document.getElementById('player-count').textContent = `${data.count} / 2`;
+        });
+
+        socket.on('match-found', (data) => {
+            document.getElementById('status-msg').textContent = '¡Partida encontrada! Redirigiendo...';
+            // Redirigir al juego correspondiente
+            const destination = gameType === '3d' ? '/game/3d' : '/game/2d';
+            setTimeout(() => {
+                window.location.href = `${destination}?room=${data.roomId}`;
+            }, 1500);
+        });
+
+        // Cancelar — notificar al servidor y volver al menú
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            socket.emit('leave-waiting-room');
+        });
+    </script>
+</body>
+
+</html>

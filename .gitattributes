@@ -1,0 +1,5 @@
+*.gltf !text !filter !merge !diff
+*.glb !text !filter !merge !diff
+*.bin !text !filter !merge !diff
+*.png !text !filter !merge !diff
+*.jpg !text !filter !merge !diff
