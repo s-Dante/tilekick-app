@@ -4,64 +4,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick - Configuración</title>
+    <title>TileKick — Configuración</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/protected/layout.css">
+    <link rel="stylesheet" href="/styles/protected/settings.css">
 </head>
 
 <body>
-    <div id="layout">
+<div id="layout">
 
-        <!-- Barra lateral -->
-        <nav id="sidebar">
-            <div id="sidebar-header">
-                <h2>TileKick</h2>
-            </div>
-            <ul id="sidebar-nav">
-                <li><a href="/dashboard">Inicio</a></li>
-                <li><a href="/game/menu">Jugar</a></li>
-                <li><a href="/leaderboard">Clasificación</a></li>
-                <li><a href="/profile">Perfil</a></li>
-                <li><a href="/settings">Configuración</a></li>
-            </ul>
-            <div id="sidebar-footer">
-                <a href="/logout" id="logout-btn">Cerrar sesión</a>
-            </div>
-        </nav>
+    <nav id="sidebar">
+        <div id="sidebar-header">
+            <h2>TileKick</h2>
+        </div>
+        <ul id="sidebar-nav">
+            <li><a href="/dashboard">Inicio</a></li>
+            <li><a href="/game/menu">Jugar</a></li>
+            <li><a href="/leaderboard">Clasificación</a></li>
+            <li><a href="/profile">Perfil</a></li>
+            <li><a href="/settings">Configuración</a></li>
+        </ul>
+        <div id="sidebar-footer">
+            <a href="/logout" id="logout-btn">Cerrar sesión</a>
+        </div>
+    </nav>
 
-        <!-- Contenido principal -->
-        <main id="content">
+    <main id="content">
+
+        <div class="page-header">
             <h1>Configuración</h1>
+            <p>Administra tu cuenta y preferencias.</p>
+        </div>
 
-            <section>
-                <h2>Cuenta</h2>
-                <form id="settingsForm">
-                    <label for="name">Nombre</label>
-                    <input type="text" id="name" name="name" placeholder="Tu nombre">
-
-                    <label for="email">Correo electrónico</label>
-                    <input type="email" id="email" name="email" placeholder="Tu correo">
-
-                    <label for="currentPassword">Contraseña actual</label>
-                    <input type="password" id="currentPassword" name="currentPassword" placeholder="Contraseña actual">
-
-                    <label for="newPassword">Nueva contraseña</label>
-                    <input type="password" id="newPassword" name="newPassword" placeholder="Nueva contraseña">
-
-                    <button type="submit">Guardar cambios</button>
+        <!-- Sección: Información personal -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <h2>Información personal</h2>
+                <p>Actualiza tu nombre y correo electrónico.</p>
+            </div>
+            <div class="settings-body">
+                <form class="settings-form" id="accountForm">
+                    <div class="form-group">
+                        <label for="name">Nombre</label>
+                        <input class="input" type="text" id="name" name="name" placeholder="Tu nombre">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Correo electrónico</label>
+                        <input class="input" type="email" id="email" name="email" placeholder="tu@correo.com">
+                    </div>
+                    <p id="accountError" class="error-msg"></p>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
                 </form>
-            </section>
+            </div>
+        </div>
 
-            <section>
+        <!-- Sección: Contraseña -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <h2>Contraseña</h2>
+                <p>Cambia tu contraseña de acceso.</p>
+            </div>
+            <div class="settings-body">
+                <form class="settings-form" id="passwordForm">
+                    <div class="form-group">
+                        <label for="currentPassword">Contraseña actual</label>
+                        <input class="input" type="password" id="currentPassword" placeholder="Contraseña actual">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">Nueva contraseña</label>
+                        <input class="input" type="password" id="newPassword" placeholder="Nueva contraseña">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmNewPassword">Confirmar contraseña</label>
+                        <input class="input" type="password" id="confirmNewPassword" placeholder="Repite la nueva contraseña">
+                    </div>
+                    <p id="passwordError" class="error-msg"></p>
+                    <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Sección: Preferencias -->
+        <div class="settings-section">
+            <div class="settings-section-header">
                 <h2>Preferencias</h2>
-                <label for="language">Idioma</label>
-                <select id="language" name="language">
-                    <option value="es">Español</option>
-                    <option value="en">English</option>
-                </select>
-            </section>
-        </main>
+                <p>Ajusta el idioma y otras opciones.</p>
+            </div>
+            <div class="settings-body">
+                <form class="settings-form">
+                    <div class="form-group">
+                        <label for="language">Idioma</label>
+                        <select class="input" id="language" name="language">
+                            <option value="es">Español</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar preferencias</button>
+                </form>
+            </div>
+        </div>
 
-    </div>
+    </main>
+
+</div>
+<script>
+    document.querySelectorAll('#sidebar-nav a').forEach(link => {
+        if (new URL(link.href).pathname === window.location.pathname)
+            link.classList.add('active');
+    });
+</script>
 </body>
-
 </html>

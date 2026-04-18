@@ -4,39 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick</title>
-
-    <link rel="stylesheet" type="text/css" href="/styles/index.css">
+    <title>TileKick — El fútbol táctico</title>
+    <meta name="description" content="TileKick combina estrategia y fútbol. Juega en 2D o 3D, online o local.">
+    <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/landing.css">
 </head>
 
 <body>
-    <main>
-        <section>
-            <h1>TileKick</h1>
-            <p>El mejor juego de fútbol</p>
+    <div id="landing-wrapper">
+
+        <!-- Hero -->
+        <section id="hero">
+            <span id="hero-eyebrow">Fútbol táctico · 2D &amp; 3D</span>
+            <h1>TILEKICK</h1>
+            <p id="hero-subtitle">Arma tu estrategia y demuestra tu habilidad.</p>
+            <div id="hero-actions">
+                <a href="/login" class="btn btn-primary">Jugar ahora</a>
+                <a href="/register" class="btn btn-outline" style="display: none;">Registrarse</a>
+            </div>
         </section>
 
-        <a href="/login">Iniciar sesión</a>
+        <!-- Features -->
+        <section id="features">
+            <div id="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">👥 🌐</div>
+                    <h3>Multijugador Online</h3>
+                    <p>Juega contra rivales reales de todo el mundo en tiempo real.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👥 🎮</div>
+                    <h3>Multijugador Local</h3>
+                    <p>Comparte pantalla y decide cara a cara quién es el estratega superior.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👤 🤖</div>
+                    <h3>Tú vs. IA</h3>
+                    <p>Entrena contra inteligencia artificial en distintos niveles de dificultad.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🏆 🥇</div>
+                    <h3>Ranking Global</h3>
+                    <p>Sube posiciones en la clasificación mundial y demuestra tu dominio.</p>
+                </div>
+            </div>
+        </section>
 
-        <article>
-            <div>
-                <h2>Multijugador Online</h2>
-                <p>Juega con tus amigos en tiempo real</p>
-            </div>
-            <div>
-                <h2>Multijugador Local</h2>
-                <p>Juega con amigos en la misma pantalla</p>
-            </div>
-            <div>
-                <h2>Tú vs. IAs</h2>
-                <p>Enfréntate a la inteligencia artificial en partidos emocionantes</p>
-            </div>
-            <div>
-                <h2>Ranking</h2>
-                <p>Lidera el ranking mundial para demostrar quién es el mejor</p>
-            </div>
-        </article>
-    </main>
+    </div>
 </body>
 
 </html>

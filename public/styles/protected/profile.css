@@ -1,0 +1,60 @@
+/* ============================================================
+   PROFILE PAGE
+   ============================================================ */
+
+/* Card de info del usuario */
+.profile-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-6);
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  border: 2px solid var(--border-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.profile-info h2 {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--sp-1);
+}
+
+.profile-info .username {
+  font-size: var(--text-sm);
+  color: var(--primary);
+  margin-bottom: var(--sp-3);
+}
+
+.profile-meta {
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+
+.profile-meta-item {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.profile-meta-item strong {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-weight: 600;
+}

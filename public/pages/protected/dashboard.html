@@ -4,53 +4,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick - Dashboard</title>
+    <title>TileKick — Dashboard</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/protected/layout.css">
+    <link rel="stylesheet" href="/styles/protected/dashboard.css">
 </head>
 
 <body>
-    <div id="layout">
+<div id="layout">
 
-        <!-- Barra lateral -->
-        <nav id="sidebar">
-            <div id="sidebar-header">
-                <h2>TileKick</h2>
-            </div>
-            <ul id="sidebar-nav">
-                <li><a href="/dashboard">Inicio</a></li>
-                <li><a href="/game/menu">Jugar</a></li>
-                <li><a href="/leaderboard">Clasificación</a></li>
-                <li><a href="/profile">Perfil</a></li>
-                <li><a href="/settings">Configuración</a></li>
-            </ul>
-            <div id="sidebar-footer">
-                <a href="/logout" id="logout-btn">Cerrar sesión</a>
-            </div>
-        </nav>
+    <!-- Sidebar -->
+    <nav id="sidebar">
+        <div id="sidebar-header">
+            <h2>TileKick</h2>
+        </div>
+        <ul id="sidebar-nav">
+            <li><a href="/dashboard">Inicio</a></li>
+            <li><a href="/game/menu">Jugar</a></li>
+            <li><a href="/leaderboard">Clasificación</a></li>
+            <li><a href="/profile">Perfil</a></li>
+            <li><a href="/settings">Configuración</a></li>
+        </ul>
+        <div id="sidebar-footer">
+            <a href="/logout" id="logout-btn">Cerrar sesión</a>
+        </div>
+    </nav>
 
-        <!-- Contenido principal -->
-        <main id="content">
+    <!-- Contenido -->
+    <main id="content">
+
+        <div class="page-header">
             <h1>Dashboard</h1>
-            <p>Bienvenido a TileKick. Selecciona una opción del menú para comenzar.</p>
+            <p>Bienvenido de vuelta. Aquí está tu resumen.</p>
+        </div>
 
-            <section>
-                <h2>Tu resumen</h2>
-                <ul>
-                    <li>Partidas jugadas: —</li>
-                    <li>Victorias: —</li>
-                    <li>Derrotas: —</li>
-                    <li>Posición en ranking: —</li>
-                </ul>
-            </section>
+        <!-- Stats rápidos -->
+        <section class="content-section">
+            <h2>Tu desempeño</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <p class="stat-label">Partidas</p>
+                    <p class="stat-value">—</p>
+                    <p class="stat-sub">total jugadas</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Victorias</p>
+                    <p class="stat-value">—</p>
+                    <p class="stat-sub">partidas ganadas</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Ranking</p>
+                    <p class="stat-value">—</p>
+                    <p class="stat-sub">posición global</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label">Racha</p>
+                    <p class="stat-value">—</p>
+                    <p class="stat-sub">victorias seguidas</p>
+                </div>
+            </div>
+        </section>
 
-            <section>
-                <h2>Accesos rápidos</h2>
-                <a href="/game/menu">Jugar ahora</a>
-                <a href="/leaderboard">Ver clasificación</a>
-            </section>
-        </main>
+        <!-- Accesos rápidos -->
+        <section class="content-section">
+            <h2>Acceso rápido</h2>
+            <div class="quick-links">
+                <a href="/game/menu" class="btn btn-primary">Buscar partida</a>
+                <a href="/leaderboard" class="btn btn-ghost">Ver clasificación</a>
+            </div>
+        </section>
 
-    </div>
+        <!-- Actividad reciente -->
+        <section class="content-section">
+            <h2>Actividad reciente</h2>
+            <div class="activity-list">
+                <div class="activity-item">
+                    <span>Sin partidas recientes</span>
+                    <span class="activity-meta">—</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+</div>
+
+<script>
+    // Marcar el nav activo según URL actual
+    document.querySelectorAll('#sidebar-nav a').forEach(link => {
+        if (new URL(link.href).pathname === window.location.pathname) {
+            link.classList.add('active');
+        }
+    });
+</script>
 </body>
-
 </html>

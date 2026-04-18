@@ -1,0 +1,235 @@
+/* ============================================================
+   WAITING ROOM — full screen, sin sidebar
+   ============================================================ */
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+#waiting-wrapper {
+  width: 100%;
+  max-width: 560px;
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+/* --- Título y subtítulo --- */
+.waiting-header { text-align: center; }
+.waiting-header h1 {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: var(--sp-2);
+}
+.waiting-header p {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* --- Animación de puntos --- */
+@keyframes dot-pulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+  40%           { transform: scale(1);   opacity: 1; }
+}
+.waiting-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-3);
+}
+.waiting-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: dot-pulse 1.4s infinite ease-in-out;
+}
+.waiting-dots span:nth-child(2) { animation-delay: 0.2s; }
+.waiting-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* Hide dots when match is found */
+.waiting-dots.hidden { display: none; }
+
+/* --- Slots de jugadores --- */
+#players-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+.player-slot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5);
+  text-align: center;
+  transition: border-color var(--transition);
+}
+.player-slot.connected {
+  border-color: var(--primary);
+}
+.player-slot.found {
+  border-color: var(--teal-lt);
+  background: rgba(13, 148, 136, 0.07);
+}
+
+.player-slot-avatar {
+  font-size: 2rem;
+  margin-bottom: var(--sp-3);
+}
+.player-slot-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.player-slot-status {
+  font-size: var(--text-xs);
+  color: var(--text-hint);
+  margin-top: var(--sp-1);
+}
+.player-slot.connected .player-slot-status { color: var(--primary); }
+.player-slot.found     .player-slot-status { color: var(--teal-lt); }
+
+/* --- Info de la partida --- */
+#match-info {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5) var(--sp-6);
+}
+#match-info h2 {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-4);
+}
+#match-info ul {
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+#match-info li {
+  font-size: var(--text-sm);
+}
+#match-info li strong {
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-right: var(--sp-2);
+}
+#match-info li span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* --- Log de eventos en vivo --- */
+#event-log {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+#event-log-header {
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+/* Dot indicador de "vivo" */
+#event-log-header::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: dot-pulse 1.4s infinite;
+}
+#event-log-list {
+  padding: var(--sp-3) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 120px;
+  overflow-y: auto;
+}
+.log-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  animation: fadeIn 0.3s ease;
+}
+.log-entry .log-icon { flex-shrink: 0; }
+.log-entry .log-time {
+  color: var(--text-hint);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.log-entry.success { color: var(--teal-lt); }
+.log-entry.info    { color: var(--text-muted); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Match found state --- */
+#match-found-banner {
+  display: none;
+  text-align: center;
+  padding: var(--sp-5);
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg);
+}
+#match-found-banner.visible { display: block; }
+#match-found-banner h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: var(--sp-2);
+}
+#match-found-banner p {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+#countdown {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--primary);
+  display: block;
+  margin-top: var(--sp-2);
+}
+
+/* --- Cancel btn --- */
+#cancel-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--sp-3) var(--sp-6);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: background var(--transition), color var(--transition);
+  text-align: center;
+}
+#cancel-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}

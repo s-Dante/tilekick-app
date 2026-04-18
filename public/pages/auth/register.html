@@ -4,41 +4,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick - Registro</title>
-    <link rel="stylesheet" type="text/css" href="/styles/index.css">
+    <title>TileKick — Crear cuenta</title>
+    <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/auth/auth.css">
 </head>
 
-<body>
-    <main>
-        <section>
-            <div>
-                <h1>TileKick</h1>
+<body class="auth-page">
+
+    <div class="auth-card" style="max-width: 460px;">
+
+        <!-- Encabezado -->
+        <div class="auth-card-header">
+            <h1>Crear cuenta</h1>
+            <p class="auth-card-subtitle">Únete gratis y comienza a jugar en segundos.</p>
+        </div>
+
+        <!-- Formulario -->
+        <form id="registerForm" class="auth-form">
+
+            <div class="auth-field">
+                <label for="name">Nombre completo</label>
+                <input class="input" type="text" id="name" name="name"
+                       placeholder="Tu nombre" autocomplete="name">
             </div>
-            <div>
-                <form id="registerForm">
-                    <label for="name">Nombre</label>
-                    <input type="text" name="name" id="name" placeholder="Nombre">
 
-                    <label for="username">Usuario</label>
-                    <input type="text" name="username" id="username" placeholder="Usuario">
-
-                    <label for="email">Correo electrónico</label>
-                    <input type="email" name="email" id="email" placeholder="Correo electrónico">
-
-                    <label for="password">Contraseña</label>
-                    <input type="password" name="password" id="password" placeholder="Contraseña">
-
-                    <label for="confirmPassword">Confirmar contraseña</label>
-                    <input type="password" name="confirmPassword" id="confirmPassword" placeholder="Confirmar contraseña">
-
-                    <p id="errorMsg" style="color: red; display: none;"></p>
-
-                    <button type="submit">Registrarse</button>
-                </form>
-                <p>¿Ya tienes cuenta? <a href="/login">Iniciar sesión</a></p>
+            <div class="auth-field">
+                <label for="username">Usuario</label>
+                <input class="input" type="text" id="username" name="username"
+                       placeholder="Nombre de usuario único" autocomplete="username">
             </div>
-        </section>
-    </main>
+
+            <div class="auth-field">
+                <label for="email">Correo electrónico</label>
+                <input class="input" type="email" id="email" name="email"
+                       placeholder="tu@correo.com" autocomplete="email">
+            </div>
+
+            <div class="auth-field">
+                <label for="password">Contraseña</label>
+                <input class="input" type="password" id="password" name="password"
+                       placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+
+            <div class="auth-field">
+                <label for="confirmPassword">Confirmar contraseña</label>
+                <input class="input" type="password" id="confirmPassword" name="confirmPassword"
+                       placeholder="Repite tu contraseña" autocomplete="new-password">
+            </div>
+
+            <p id="errorMsg" class="error-msg"></p>
+
+            <button type="submit" class="btn btn-primary btn-submit">Crear cuenta</button>
+
+        </form>
+
+        <p class="auth-footer">
+            ¿Ya tienes cuenta? <a href="/login">Iniciar sesión</a>
+        </p>
+
+    </div>
 
     <script>
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
@@ -47,31 +71,29 @@
             errorMsg.style.display = 'none';
 
             const body = {
-                name: document.getElementById('name').value.trim(),
-                username: document.getElementById('username').value.trim(),
-                email: document.getElementById('email').value.trim(),
-                password: document.getElementById('password').value,
+                name:            document.getElementById('name').value.trim(),
+                username:        document.getElementById('username').value.trim(),
+                email:           document.getElementById('email').value.trim(),
+                password:        document.getElementById('password').value,
                 confirmPassword: document.getElementById('confirmPassword').value,
             };
 
-            const res = await fetch('/register', {
+            const res  = await fetch('/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
-
             const data = await res.json();
 
             if (!res.ok) {
-                errorMsg.textContent = data.error || 'Error al registrarse';
+                errorMsg.textContent   = data.error || 'Error al registrarse';
                 errorMsg.style.display = 'block';
                 return;
             }
 
-            // Registro exitoso → ir al login
             window.location.href = '/login';
         });
     </script>
-</body>
 
+</body>
 </html>

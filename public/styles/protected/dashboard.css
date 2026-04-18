@@ -1,0 +1,44 @@
+/* ============================================================
+   DASHBOARD PAGE
+   ============================================================ */
+
+/* Links de acceso rápido */
+.quick-links {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.quick-links .btn {
+  padding: var(--sp-4) var(--sp-6);
+}
+
+/* Mini tabla de actividad reciente */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+}
+
+.activity-item .activity-result {
+  font-weight: 600;
+}
+.activity-item .result-win   { color: var(--teal-lt); }
+.activity-item .result-loss  { color: #f87171; }
+.activity-item .result-draw  { color: var(--text-muted); }
+
+.activity-item .activity-meta {
+  color: var(--text-hint);
+  font-size: var(--text-xs);
+}

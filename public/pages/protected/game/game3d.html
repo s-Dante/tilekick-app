@@ -4,63 +4,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick - Juego 3D</title>
+    <title>TileKick — Juego 3D</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/protected/game/game.css">
 </head>
 
 <body>
-    <div id="layout">
+    <div id="game-layout">
 
-        <!-- Barra lateral -->
-        <nav id="sidebar">
-            <div id="sidebar-header">
-                <h2>TileKick</h2>
-            </div>
-            <ul id="sidebar-nav">
-                <li><a href="/dashboard">Inicio</a></li>
-                <li><a href="/game/menu">Jugar</a></li>
-                <li><a href="/leaderboard">Clasificación</a></li>
-                <li><a href="/profile">Perfil</a></li>
-                <li><a href="/settings">Configuración</a></li>
-            </ul>
-            <div id="sidebar-footer">
-                <a href="/logout" id="logout-btn">Cerrar sesión</a>
-            </div>
-        </nav>
-
-        <!-- Contenido principal -->
-        <main id="content">
-            <h1>Juego 3D</h1>
-
-            <div id="game-info">
-                <span>Sala: <strong id="room-id">—</strong></span>
-                <span>Marcador: <strong id="score">0 - 0</strong></span>
-                <span>Tiempo: <strong id="timer">05:00</strong></span>
+        <!-- HUD -->
+        <header id="game-hud">
+            <div class="hud-block">
+                <span class="hud-logo">TileKick</span>
+                <div class="hud-player" id="hud-p1">
+                    <span class="player-dot"></span>
+                    <span class="player-name" id="hud-p1-name">—</span>
+                </div>
+                <span class="hud-sep">vs</span>
+                <div class="hud-player" id="hud-p2">
+                    <span class="player-dot"></span>
+                    <span class="player-name" id="hud-p2-name">—</span>
+                </div>
             </div>
 
-            <!-- Contenedor donde Three.js montará el renderer -->
-            <div id="gameContainer" style="width: 800px; height: 500px; background: #000;">
-                <!-- Three.js renderizará aquí -->
+            <div class="hud-block">
+                <div id="score">
+                    <span id="score-a">0</span>
+                    <span class="score-sep">—</span>
+                    <span id="score-b">0</span>
+                </div>
             </div>
 
-            <div id="game-controls">
-                <a href="/game/menu" id="exit-btn">Salir de la partida</a>
+            <div class="hud-block">
+                <p id="turn-indicator" class="hud-room">Turno: <span id="turn-team">A</span></p>
+                <p class="hud-room">Sala <span id="room-id-display">—</span></p>
+                <a href="/game/menu" id="exit-btn">Salir</a>
             </div>
-        </main>
+        </header>
 
+        <!-- Área de juego -->
+        <div id="game-area">
+
+            <!-- Viewport 3D -->
+            <div id="game-viewport">
+                <div id="gameContainer" style="width:100%;height:100%;"></div>
+            </div>
+
+            <!-- Panel lateral -->
+            <aside id="side-panel">
+                <div class="side-panel-header">Jugadores</div>
+                <div id="side-players">
+                    <div class="side-player" id="side-p1">
+                        <span class="dot"></span>
+                        <div class="player-info">
+                            <strong id="side-p1-name">Equipo A</strong>
+                            <span>Turno actual</span>
+                        </div>
+                    </div>
+                    <div class="side-player" id="side-p2">
+                        <span class="dot"></span>
+                        <div class="player-info">
+                            <strong id="side-p2-name">Equipo B</strong>
+                            <span>Esperando</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p id="side-player-count"
+                    style="padding: var(--sp-3) var(--sp-5); font-size: var(--text-xs); color: var(--text-hint); border-bottom: 1px solid var(--border);">
+                    Fase: <span id="phase-label">Movimiento</span>
+                </p>
+
+                <div class="side-panel-header" style="display: none;">Registro de eventos</div>
+                <div id="side-log-list" style="display: none;"></div>
+            </aside>
+
+        </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
+    <!-- Importmap para Three.js -->
+    <script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+}
+</script>
+
+    <script type="module">
+        import { GameState, PHASES } from '/engine/game.js';
+        import { AIPlayer, AI_LEVELS } from '/engine/ai.js';
+        import { Renderer3D } from '/js/game/renderer3d.js';
+
+        // ── Parámetros de URL ──────────────────────────────────────
         const params = new URLSearchParams(window.location.search);
-        const roomId = params.get('room') || '—';
-        document.getElementById('room-id').textContent = roomId;
+        const mode = params.get('mode') ?? 'local';
+        const mapName = params.get('map') ?? 'estadio_clasico';
+        const roomId = params.get('room') ?? null;
 
-        const socket = io();
-        socket.emit('join-room', { roomId });
+        // ── Info del usuario ───────────────────────────────────────
+        const me = await fetch('/api/me').then(r => r.json()).catch(() => ({}));
+        const username = me.username ?? 'Jugador';
 
-        // TODO: lógica del juego 3D con Three.js
+        // ── State ─────────────────────────────────────────────────
+        const gs = new GameState({ mapName, mode });
+
+        // ── IA ────────────────────────────────────────────────────
+        const aiPlayer = mode === 'ai' ? new AIPlayer('B', AI_LEVELS.MEDIUM) : null;
+
+        // ── UI helpers ─────────────────────────────────────────────
+        document.getElementById('hud-p1-name').textContent = username;
+        document.getElementById('hud-p1').classList.add('connected');
+        document.getElementById('side-p1-name').textContent = username;
+        document.getElementById('side-p1').classList.add('connected');
+
+        if (mode !== 'online') {
+            const p2name = mode === 'ai' ? 'IA' : 'Jugador 2';
+            document.getElementById('hud-p2-name').textContent = p2name;
+            document.getElementById('side-p2-name').textContent = p2name;
+            document.getElementById('side-p2').classList.add('connected');
+        }
+
+        if (roomId) document.getElementById('room-id-display').textContent = roomId;
+
+        function addLog(msg, type = 'info') {
+            const list = document.getElementById('side-log-list');
+            const now = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const el = document.createElement('div');
+            el.className = `side-log-entry ${type}`;
+            el.innerHTML = `<span class="log-msg">${msg}</span><span class="log-time">${now}</span>`;
+            list.appendChild(el);
+            list.scrollTop = list.scrollHeight;
+        }
+
+        function updateHUD() {
+            const { score, turn, phase } = gs;
+            document.getElementById('score-a').textContent = score.A;
+            document.getElementById('score-b').textContent = score.B;
+            document.getElementById('turn-team').textContent = turn;
+
+            const labels = {
+                [PHASES.MOVE]: 'Movimiento',
+                [PHASES.SAVE]: '¡Disparo! → Atajar',
+            };
+            document.getElementById('phase-label').textContent = labels[phase] ?? phase;
+
+            document.getElementById('side-p1').querySelector('span:last-child').textContent =
+                turn === 'A' ? 'Turno actual' : 'Esperando';
+            document.getElementById('side-p2').querySelector('span:last-child').textContent =
+                turn === 'B' ? 'Turno actual' : 'Esperando';
+        }
+
+        // ── Renderer 3D ────────────────────────────────────────────
+        const container = document.getElementById('gameContainer');
+        const renderer = new Renderer3D(container, gs, {
+            onLog: msg => { addLog(msg); updateHUD(); },
+            onAction: result => {
+                updateHUD();
+
+                // IA turn
+                if (mode === 'ai' && gs.turn === 'B' && gs.phase === PHASES.MOVE && aiPlayer) {
+                    setTimeout(() => {
+                        const aiMove = aiPlayer.computeMove(gs);
+                        if (aiMove) {
+                            gs.selectPiece(aiMove.pieceId);
+                            const r = gs.commitAction(aiMove.targetRow, aiMove.targetCol);
+                            if (r.ok) {
+                                addLog(`[IA] ${r.event}`);
+                                updateHUD();
+                                renderer.updateScene();
+                            }
+                        }
+                    }, 700);
+                }
+            },
+        });
+
+        // Primer update de la escena
+        renderer.updateScene();
+        updateHUD();
+        addLog('Partida 3D iniciada. Haz clic en tus piezas para seleccionarlas.');
+
+        // ── Socket.io para modo online ─────────────────────────────
+        if (mode === 'online' && roomId) {
+            const socket = io();
+            socket.on('connect', () => {
+                addLog(`Conectado a la sala ${roomId}`);
+                socket.emit('join-room', { roomId, username });
+            });
+            socket.on('player-joined', data => {
+                if (data.socketId !== socket.id) {
+                    document.getElementById('hud-p2-name').textContent = data.username;
+                    document.getElementById('side-p2-name').textContent = data.username;
+                    document.getElementById('side-p2').classList.add('connected');
+                    addLog(`${data.username} se unió`, 'success');
+                }
+            });
+        }
     </script>
+
+    <script src="/socket.io/socket.io.js"></script>
 </body>
 
 </html>

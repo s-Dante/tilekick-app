@@ -4,102 +4,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick - Sala de espera</title>
+    <title>TileKick — Sala de espera</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/protected/game/waiting.css">
 </head>
 
 <body>
-    <div id="layout">
+<div id="waiting-wrapper">
 
-        <!-- Barra lateral -->
-        <nav id="sidebar">
-            <div id="sidebar-header">
-                <h2>TileKick</h2>
-            </div>
-            <ul id="sidebar-nav">
-                <li><a href="/dashboard">Inicio</a></li>
-                <li><a href="/game/menu">Jugar</a></li>
-                <li><a href="/leaderboard">Clasificación</a></li>
-                <li><a href="/profile">Perfil</a></li>
-                <li><a href="/settings">Configuración</a></li>
-            </ul>
-            <div id="sidebar-footer">
-                <a href="/logout" id="logout-btn">Cerrar sesión</a>
-            </div>
-        </nav>
-
-        <!-- Contenido principal -->
-        <main id="content">
-            <h1>Sala de espera</h1>
-            <p>Buscando partida con tus parámetros...</p>
-
-            <section id="match-info">
-                <h2>Parámetros de la partida</h2>
-                <ul>
-                    <li><strong>Modo:</strong> <span id="info-mode">—</span></li>
-                    <li><strong>Mapa:</strong> <span id="info-map">—</span></li>
-                    <li><strong>Tipo:</strong> <span id="info-gameType">—</span></li>
-                </ul>
-            </section>
-
-            <section id="waiting-status">
-                <p id="status-msg">Conectando con el servidor...</p>
-                <p>Jugadores en la sala: <span id="player-count">1 / 2</span></p>
-            </section>
-
-            <a href="/game/menu" id="cancel-btn">Cancelar búsqueda</a>
-        </main>
-
+    <!-- Encabezado -->
+    <div class="waiting-header">
+        <h1>Buscando partida</h1>
+        <p>Esperando a otro jugador con la misma configuración...</p>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        // Leer parámetros de la URL
-        const params  = new URLSearchParams(window.location.search);
-        const mode     = params.get('mode')     || '—';
-        const map      = params.get('map')      || '—';
-        const gameType = params.get('gameType') || '—';
+    <!-- Animación de puntos -->
+    <div class="waiting-dots" id="waitingDots">
+        <span></span><span></span><span></span>
+    </div>
 
-        const modeLabels = {
-            online: 'Multijugador online',
-            local:  'Multijugador local',
-            ai:     'Contra la IA',
-        };
-        const mapLabels = {
-            estadio_clasico: 'Estadio clásico',
-            arena_nocturna:  'Arena nocturna',
-            campo_playa:     'Campo de playa',
-            aleatorio:       'Aleatorio',
-        };
+    <!-- Slots de jugadores -->
+    <div id="players-panel">
+        <div class="player-slot connected" id="slot-you">
+            <div class="player-slot-avatar">👤</div>
+            <div class="player-slot-name" id="slot-you-name">Tú</div>
+            <div class="player-slot-status">Conectado ✓</div>
+        </div>
+        <div class="player-slot" id="slot-opponent">
+            <div class="player-slot-avatar">⌛</div>
+            <div class="player-slot-name">Oponente</div>
+            <div class="player-slot-status">Buscando...</div>
+        </div>
+    </div>
 
-        document.getElementById('info-mode').textContent     = modeLabels[mode]     || mode;
-        document.getElementById('info-map').textContent      = mapLabels[map]        || map;
-        document.getElementById('info-gameType').textContent = gameType.toUpperCase();
+    <!-- Configuración de la partida -->
+    <div id="match-info">
+        <h2>Tu configuración</h2>
+        <ul>
+            <li><strong>Modo</strong>  <span id="info-mode">—</span></li>
+            <li><strong>Mapa</strong>  <span id="info-map">—</span></li>
+            <li><strong>Tipo</strong>  <span id="info-gameType">—</span></li>
+        </ul>
+    </div>
 
-        // Socket.io — sala de espera
-        const socket = io();
+    <!-- Banner de match encontrado -->
+    <div id="match-found-banner">
+        <h2>¡Oponente encontrado!</h2>
+        <p>Redirigiendo al juego en <span id="countdown">3</span>s...</p>
+    </div>
 
-        socket.emit('join-waiting-room', { mode, map, gameType });
+    <!-- Log de eventos en vivo -->
+    <div id="event-log">
+        <div id="event-log-header">Eventos en vivo</div>
+        <div id="event-log-list"></div>
+    </div>
 
-        socket.on('waiting', (data) => {
-            document.getElementById('status-msg').textContent = 'Buscando oponente...';
-            document.getElementById('player-count').textContent = `${data.count} / 2`;
-        });
+    <!-- Cancelar -->
+    <a href="/game/menu" id="cancel-btn">Cancelar búsqueda</a>
 
-        socket.on('match-found', (data) => {
-            document.getElementById('status-msg').textContent = '¡Partida encontrada! Redirigiendo...';
-            // Redirigir al juego correspondiente
-            const destination = gameType === '3d' ? '/game/3d' : '/game/2d';
-            setTimeout(() => {
-                window.location.href = `${destination}?room=${data.roomId}`;
-            }, 1500);
-        });
+</div>
 
-        // Cancelar — notificar al servidor y volver al menú
-        document.getElementById('cancel-btn').addEventListener('click', () => {
-            socket.emit('leave-waiting-room');
-        });
-    </script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(async () => {
+    // 1. Obtener info del usuario actual desde el servidor
+    const me = await fetch('/api/me').then(r => r.json()).catch(() => ({}));
+    const username = me.username || 'Jugador';
+    document.getElementById('slot-you-name').textContent = username;
+
+    // 2. Leer parámetros de la URL
+    const params   = new URLSearchParams(window.location.search);
+    const mode     = params.get('mode')     || 'online';
+    const map      = params.get('map')      || '';
+    const gameType = params.get('gameType') || '2d';
+
+    const modeLabels = { online: 'Multijugador online', local: 'Multijugador local', ai: 'Contra la IA' };
+    const mapLabels  = {
+        estadio_clasico: 'Estadio clásico',
+        arena_nocturna:  'Arena nocturna',
+        campo_playa:     'Campo de playa',
+        aleatorio:       'Aleatorio',
+    };
+
+    document.getElementById('info-mode').textContent     = modeLabels[mode]    || mode;
+    document.getElementById('info-map').textContent      = mapLabels[map]        || map;
+    document.getElementById('info-gameType').textContent = gameType.toUpperCase();
+
+    // 3. Helpers de UI
+    function addLog(icon, msg, type = 'info') {
+        const list = document.getElementById('event-log-list');
+        const now  = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const el   = document.createElement('div');
+        el.className = `log-entry ${type}`;
+        el.innerHTML = `
+            <span class="log-icon">${icon}</span>
+            <span class="log-msg">${msg}</span>
+            <span class="log-time">${now}</span>`;
+        list.appendChild(el);
+        list.scrollTop = list.scrollHeight;
+    }
+
+    function showMatchFound(data) {
+        // Actualizar slot del oponente
+        const opponentName = data.players.find(p => p.socketId !== socket.id)?.username || 'Oponente';
+        const slotOpponent = document.getElementById('slot-opponent');
+        slotOpponent.querySelector('.player-slot-avatar').textContent = '👤';
+        slotOpponent.querySelector('.player-slot-name').textContent   = opponentName;
+        slotOpponent.querySelector('.player-slot-status').textContent = 'Conectado ✓';
+        slotOpponent.classList.add('found');
+        document.getElementById('slot-you').classList.add('found');
+
+        // Ocultar dots, mostrar banner
+        document.getElementById('waitingDots').classList.add('hidden');
+        document.getElementById('match-found-banner').classList.add('visible');
+        document.getElementById('cancel-btn').style.display = 'none';
+
+        // Countdown y redirección
+        let secs = 3;
+        const countdownEl = document.getElementById('countdown');
+        const interval = setInterval(() => {
+            secs--;
+            countdownEl.textContent = secs;
+            if (secs <= 0) {
+                clearInterval(interval);
+                const dest = (data.gameType || gameType) === '3d' ? '/game/3d' : '/game/2d';
+                window.location.href = `${dest}?mode=online&map=${encodeURIComponent(map)}&room=${data.roomId}`;
+            }
+        }, 1000);
+    }
+
+    // 4. Conectar Socket.io
+    const socket = io();
+
+    socket.on('connect', () => {
+        addLog('🔌', `Conectado al servidor (${socket.id.slice(0, 8)})`);
+        socket.emit('join-waiting-room', { mode, map, gameType, username });
+    });
+
+    socket.on('waiting', () => {
+        addLog('🔍', 'Buscando oponente con la misma configuración...');
+    });
+
+    socket.on('match-found', (data) => {
+        const opponentName = data.players.find(p => p.socketId !== socket.id)?.username || 'Oponente';
+        addLog('🎯', `¡Match encontrado! Sala: ${data.roomId}`, 'success');
+        addLog('👤', `Oponente: ${opponentName}`, 'success');
+        showMatchFound(data);
+    });
+
+    // 5. Cancelar búsqueda
+    document.getElementById('cancel-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        socket.emit('leave-waiting-room');
+        window.location.href = '/game/menu';
+    });
+})();
+</script>
 </body>
-
 </html>

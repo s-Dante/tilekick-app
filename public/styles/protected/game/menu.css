@@ -1,0 +1,105 @@
+/* ============================================================
+   GAME MENU PAGE
+   ============================================================ */
+
+/* Form container */
+#gameMenuForm {
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.form-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-6);
+}
+
+/* Modo de juego y Tipo de juego podrían ir arriba, Mapa abajo o viceversa */
+.form-columns fieldset:nth-of-type(2) {
+  grid-column: 1 / -1; /* El mapa ocupa toda la fila inferior */
+}
+
+/* Fieldsets como cards */
+#gameMenuForm fieldset {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+}
+
+#gameMenuForm legend {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+/* Radio options en grid */
+.radio-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+
+.radio-option {
+  position: relative;
+}
+
+.radio-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.radio-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--transition), background var(--transition);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.radio-label:hover {
+  border-color: var(--primary);
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.radio-option input[type="radio"]:checked + .radio-label {
+  border-color: var(--primary);
+  background: rgba(13, 148, 136, 0.1);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.radio-icon {
+  font-size: 1.4rem;
+}
+
+/* Submit button area */
+.form-submit-area {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+#gameMenuForm .btn {
+  padding: var(--sp-4) var(--sp-10);
+  font-size: var(--text-base);
+}
