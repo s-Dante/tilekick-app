@@ -5,7 +5,7 @@
 
 export const ROWS = 10;
 export const COLS = 5;
-export const LEVELS = 3;   // 0 = sin pisar · 1 = pisado 1 vez · 2 = pisado 2 veces · 3 = pisado 3 veces (impasable)
+export const LEVELS = 4;   // 0 = sin pisar · 1 = pisado 1 vez · 2 = pisado 2 veces · 3 = pisado 3 veces (impasable)
 
 // ──────────────────────────────────────────────────────────────
 //  Mapeo nombre-de-mapa → tema visual
@@ -39,21 +39,21 @@ const MAP_COLORS = {
         level0: ['#22c55e', '#4ade80'],      // verde vivo  (sin pisar)
         level1: ['#16a34a', '#22c55e'],      // verde medio (pisado 1 vez)
         level2: ['#14532d', '#166534'],      // verde oscuro (pisado 2 veces)
-        level3: ['#14532d', '#166534'],      // verde muy oscuro (pisado 3 veces impasable)
+        level3: ['#052e16', '#064e24'],      // verde casi negro (pisado 3 veces — impasable)
     },
     sand: {
         goal: '#e8e8e0',
         level0: ['#ca8a04', '#eab308'],      // arena dorada viva
         level1: ['#a16207', '#ca8a04'],      // arena oscura
         level2: ['#78350f', '#92400e'],      // arena muy oscura
-        level3: ['#14532d', '#166534'],      // arena muy oscura (pisado 3 veces impasable)|
+        level3: ['#3b1a06', '#4a2008'],      // casi negro tostado (impasable)
     },
     cement: {
         goal: '#e8e8e0',
         level0: ['#6b7280', '#9ca3af'],      // gris claro
         level1: ['#4b5563', '#6b7280'],      // gris oscuro
         level2: ['#1f2937', '#374151'],      // casi negro
-        level3: ['#14532d', '#166534'],      // arena muy oscura (pisado 3 veces impasable) 
+        level3: ['#0a0f14', '#111827'],      // negro (impasable)
     },
 };
 
@@ -163,7 +163,7 @@ export class Board {
         if (!this.isOnBoard(row, col)) return null;
         if (this.isGoalArea(row, col)) return this.colors.goal;
 
-        const level = Math.min(this.getLevel(row, col), 2);
+        const level = Math.min(this.getLevel(row, col), 3);
         const palette = this.colors[`level${level}`];
         const variant = (row + col) % 2;    // 0 → tono oscuro, 1 → tono claro
         return palette[variant];

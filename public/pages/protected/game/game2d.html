@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/styles/index.css">
     <link rel="stylesheet" href="/styles/protected/game/game.css">
     <style>
+        /* ── Badges de equipo ─────────────────────────────── */
         .my-piece-tag {
             display: inline-block;
             background: rgba(13, 148, 136, 0.15);
@@ -19,7 +20,6 @@
             color: var(--primary);
             letter-spacing: 0.04em;
         }
-
         .opponent-piece-tag {
             display: inline-block;
             background: rgba(101, 113, 58, 0.15);
@@ -31,7 +31,6 @@
             color: #7e8e48;
             letter-spacing: 0.04em;
         }
-
         #my-team-badge {
             display: inline-flex;
             align-items: center;
@@ -45,10 +44,126 @@
             color: var(--primary);
             letter-spacing: 0.05em;
         }
+
+        /* ── Pantalla de Victoria/Derrota ─────────────────── */
+        #game-over-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        #game-over-overlay.visible {
+            display: flex;
+        }
+        .game-over-modal {
+            background: #141920;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 40px 48px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(0,0,0,0.8);
+        }
+        .go-trophy { font-size: 64px; margin-bottom: 8px; }
+        .go-title {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+        .go-title.win  { color: #fbbf24; }
+        .go-title.lose { color: #ef4444; }
+        .go-title.draw { color: #6b7280; }
+        .go-score {
+            font-size: 48px;
+            font-weight: 900;
+            color: #f0efe9;
+            margin: 16px 0;
+            letter-spacing: 0.1em;
+        }
+        .go-detail {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+        .go-share {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .go-share-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: #f0efe9;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .go-share-btn:hover { background: rgba(255,255,255,0.12); }
+        .go-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .go-elo {
+            display: none;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+        .go-elo.visible { display: block; }
+        .go-elo-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .go-elo-delta.positive { color: #4ade80; font-weight: 700; }
+        .go-elo-delta.negative { color: #f87171; font-weight: 700; }
     </style>
 </head>
 
 <body>
+    <!-- ── Pantalla de fin de partida ──────────────────────── -->
+    <div id="game-over-overlay">
+        <div class="game-over-modal">
+            <div class="go-trophy" id="go-trophy">🏆</div>
+            <div class="go-title" id="go-title">¡VICTORIA!</div>
+            <div class="go-score" id="go-score">0 — 0</div>
+            <div class="go-detail" id="go-detail">Partida finalizada</div>
+            <div class="go-elo" id="go-elo">
+                <div class="go-elo-row">
+                    <span>ELO</span>
+                    <span id="go-elo-before">—</span>
+                    <span>→</span>
+                    <span id="go-elo-after">—</span>
+                    <span class="go-elo-delta" id="go-elo-delta"></span>
+                </div>
+            </div>
+            <div class="go-share">
+                <button class="go-share-btn" onclick="shareResult('facebook')">📘 Facebook</button>
+                <button class="go-share-btn" onclick="shareResult('github')">🐙 GitHub</button>
+                <button class="go-share-btn" onclick="shareResult('google')">🔍 Google</button>
+            </div>
+            <div class="go-actions">
+                <a href="/game/menu" class="btn btn-primary">Jugar de nuevo</a>
+                <a href="/dashboard" class="btn">Inicio</a>
+            </div>
+        </div>
+    </div>
+
     <div id="game-layout">
 
         <header id="game-hud">
@@ -111,41 +226,50 @@
                     <span id="phase-label">Iniciando...</span>
                 </p>
 
-                <div class="side-panel-header" style="display: none;">Eventos en vivo</div>
+                <div class="side-panel-header">Eventos</div>
                 <div id="side-log-list"></div>
             </aside>
         </div>
     </div>
 
-    <script
-        type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+    <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
 
     <script type="module">
-        import { GameState, PHASES } from '/engine/game.js';
+        import { GameState, PHASES, GOAL_LIMIT } from '/engine/game.js';
         import { AIPlayer, AI_LEVELS } from '/engine/ai.js';
         import { Renderer2D } from '/js/game/renderer2d.js';
+        import { AudioManager } from '/js/game/audio.js';
 
-        // ── Parámetros ────────────────────────────────────────────
+        // ── Parámetros de URL ─────────────────────────────────
         const params = new URLSearchParams(window.location.search);
-        const mode = params.get('mode') ?? 'local';
-        const mapName = params.get('map') ?? 'estadio_clasico';
-        const roomId = params.get('room') ?? null;
+        const mode       = params.get('mode')       ?? 'local';
+        const mapName    = params.get('map')         ?? 'estadio_clasico';
+        const roomId     = params.get('room')        ?? null;
+        const difficulty = parseInt(params.get('difficulty') ?? '2');
 
-        // ── Usuario ───────────────────────────────────────────────
+        // ── Usuario ───────────────────────────────────────────
         const me = await fetch('/api/me').then(r => r.json()).catch(() => ({}));
         const username = me.username ?? 'Jugador';
 
-        // ── Estado del juego ──────────────────────────────────────
+        // ── Preferencias (volumen) ────────────────────────────
+        const prefs = await fetch('/api/me/preferences').then(r => r.json()).catch(() => ({}));
+        const sfxVolume = prefs.sfx_volume ?? 80;
+
+        // ── Estado del juego ──────────────────────────────────
         const gs = new GameState({ mapName, mode });
 
-        // ── Variables online ──────────────────────────────────────
-        let myTeam = mode === 'online' ? null : 'A'; // null hasta recibir team-assigned
+        // ── AudioManager ──────────────────────────────────────
+        const audio = new AudioManager(gs.board.theme, { sfxVolume });
+
+        // ── Variables online ──────────────────────────────────
+        // null en online hasta recibir asignación; 'A' en AI/local para controles
+        let myTeam = mode === 'online' ? null : (mode === 'ai' ? 'A' : null);
         let socket = null;
 
-        // ── IA ────────────────────────────────────────────────────
-        const aiPlayer = mode === 'ai' ? new AIPlayer('B', AI_LEVELS.MEDIUM) : null;
+        // ── IA ────────────────────────────────────────────────
+        const aiPlayer = mode === 'ai' ? new AIPlayer('B', difficulty) : null;
 
-        // ── UI helpers ─────────────────────────────────────────────
+        // ── UI helpers ─────────────────────────────────────────
         if (roomId) document.getElementById('room-id-display').textContent = roomId;
 
         function addLog(msg, type = 'info') {
@@ -188,6 +312,7 @@
                 [PHASES.SAVE]: (myTeam === null || turn === myTeam)
                     ? '🧤 ¡Mueve tu portero para atajar!'
                     : '⏳ El rival elige dónde atajar...',
+                [PHASES.OVER]: `🏁 Partida finalizada`,
             };
             document.getElementById('phase-label').textContent = phaseMap[phase] ?? phase;
 
@@ -199,11 +324,68 @@
             }
         }
 
-        // ── Renderer ──────────────────────────────────────────────
+        // ── Pantalla de fin de partida ────────────────────────
+        let gameOverReported = false; // evitar doble envío a servidor
+
+        function showGameOver(winner, score, reason = 'normal') {
+            audio.playGameEnd();
+
+            const overlay  = document.getElementById('game-over-overlay');
+            const trophy   = document.getElementById('go-trophy');
+            const title    = document.getElementById('go-title');
+            const scoreEl  = document.getElementById('go-score');
+            const detail   = document.getElementById('go-detail');
+
+            const isMyWin = (myTeam === null)
+                ? winner === 'A'
+                : winner === myTeam;
+
+            if (myTeam === null) {
+                trophy.textContent = '🏆';
+                title.textContent = `¡Equipo ${winner} gana!`;
+                title.className = 'go-title win';
+            } else if (isMyWin) {
+                trophy.textContent = '🏆';
+                title.textContent = reason === 'forfeit' ? '¡VICTORIA! (rival abandonó)' : '¡VICTORIA!';
+                title.className = 'go-title win';
+            } else {
+                trophy.textContent = '😔';
+                title.textContent = 'DERROTA';
+                title.className = 'go-title lose';
+            }
+
+            scoreEl.textContent = `${score?.A ?? '—'} — ${score?.B ?? '—'}`;
+            detail.textContent  = reason === 'forfeit'
+                ? 'El rival se desconectó'
+                : `Primero en llegar a ${GOAL_LIMIT} goles`;
+
+            overlay.classList.add('visible');
+            window.gameResultData = { winner, score, username, mode };
+
+            // Notificar al servidor para guardar resultado (solo online, solo una vez)
+            if (mode === 'online' && socket && !gameOverReported) {
+                gameOverReported = true;
+                socket.emit('game-finished', { winnerTeam: winner });
+            }
+        }
+
+        function shareResult(platform) {
+            const d = window.gameResultData ?? {};
+            const text = `¡Acabo de jugar TileKick! Resultado: ${d.score?.A ?? 0} — ${d.score?.B ?? 0}. ¿Me retas? 🎮⚽`;
+            const urls = {
+                facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(location.origin)}&quote=${encodeURIComponent(text)}`,
+                github:   `https://github.com/`,
+                google:   `https://plus.google.com/share?url=${encodeURIComponent(location.origin)}`,
+            };
+            window.open(urls[platform], '_blank', 'width=600,height=400');
+        }
+        window.shareResult = shareResult;
+
+        // ── Renderer ──────────────────────────────────────────
         const canvas = document.getElementById('gameCanvas');
 
         const renderer = new Renderer2D(canvas, gs, {
-            myTeam,  // se actualiza vía renderer.myTeam luego
+            myTeam,
 
             onLog: (msg) => {
                 addLog(msg);
@@ -214,26 +396,100 @@
                 updateHUD();
                 renderer.render();
 
-                // ── Modo online: enviar la acción al servidor ──────
+                // Sonidos según tipo de acción
+                if (result.interception) {
+                    result.interception.success ? audio.playStealSuccess() : audio.playStealFail();
+                } else if (result.goal) {
+                    audio.playGoal();
+                } else if (result.saved) {
+                    audio.playSave();
+                } else {
+                    audio.playMove();
+                }
+
+                // Pantalla de fin si gameOver
+                if (result.gameOver) {
+                    renderer.locked = true;
+                    showGameOver(result.winner, result.score);
+                    return;
+                }
+
+                // ── Modo online: enviar acción al servidor ────
                 if (mode === 'online' && socket && result._sync) {
                     socket.emit('game-action', result._sync);
                 }
 
-                // ── Modo IA: ejecutar turno de la IA ──────────────
-                if (mode === 'ai' && gs.turn === 'B' && gs.phase === PHASES.MOVE && aiPlayer) {
-                    setTimeout(() => {
-                        const aiMove = aiPlayer.computeMove(gs);
-                        if (aiMove) {
-                            gs.selectPiece(aiMove.pieceId);
-                            const r = gs.commitAction(aiMove.targetRow, aiMove.targetCol);
-                            if (r.ok) { addLog(`[IA] ${r.event}`); updateHUD(); renderer.render(); }
-                        }
-                    }, 600);
-                }
+                // ── Modo IA: ceder el turno si corresponde ────
+                if (mode === 'ai') handleAITurn();
             },
         });
 
-        // ── Modos local / IA: setup inmediato ─────────────────────
+        // ── Turno de la IA (maneja MOVE y SAVE) ──────────────
+        function handleAITurn() {
+            if (!aiPlayer || gs.isOver() || gs.turn !== 'B') return;
+            renderer.locked = true;
+
+            if (gs.phase === PHASES.SAVE) {
+                // Humano disparó → portero IA ataja
+                setTimeout(() => {
+                    if (gs.isOver()) { renderer.locked = false; return; }
+                    const save = aiPlayer.computeSave(gs);
+                    const r = gs.commitSave(save.row, save.col);
+                    if (r.ok) {
+                        addLog(`[IA] ${r.event}`);
+                        if (r.goal) {
+                            audio.playGoal();
+                        } else if (r.saved) {
+                            audio.playSave();
+                        }
+                        updateHUD();
+                        renderer.render();
+                        if (r.gameOver) {
+                            renderer.locked = true;
+                            showGameOver(r.winner, r.score);
+                            return;
+                        }
+                    }
+                    renderer.locked = false;
+                    // Si la atajada fue exitosa, ahora la IA tiene el balón → su turno de MOVE
+                    if (!gs.isOver()) handleAITurn();
+                }, 500);
+
+            } else if (gs.phase === PHASES.MOVE) {
+                // Turno de movimiento de la IA
+                setTimeout(() => {
+                    if (gs.isOver()) { renderer.locked = false; return; }
+                    const aiMove = aiPlayer.computeMove(gs);
+                    if (aiMove) {
+                        gs.selectPiece(aiMove.pieceId);
+                        const r = gs.commitAction(aiMove.targetRow, aiMove.targetCol);
+                        if (r.ok) {
+                            addLog(`[IA] ${r.event}`);
+                            if (r.interception) {
+                                r.interception.success ? audio.playStealSuccess() : audio.playStealFail();
+                            } else if (r.goal) {
+                                audio.playGoal();
+                            } else {
+                                audio.playOpponentMove();
+                            }
+                            updateHUD();
+                            renderer.render();
+                            if (r.gameOver) {
+                                renderer.locked = true;
+                                showGameOver(r.winner, r.score);
+                                return;
+                            }
+                            // Si la IA disparó → phase=SAVE, turn=A (humano ataja) → no recursión
+                        }
+                    }
+                    renderer.locked = false;
+                }, 700);
+            } else {
+                renderer.locked = false;
+            }
+        }
+
+        // ── Modos local / IA: setup inmediato ─────────────────
         if (mode === 'local') {
             connectSlot(1, username, 'A', true);
             connectSlot(2, 'Jugador 2', 'B', false);
@@ -241,18 +497,21 @@
             addLog('Partida local iniciada');
             updateHUD();
             renderer.render();
+            audio.playGameStart();
         }
 
         if (mode === 'ai') {
+            const diffLabels = { 1: 'Fácil', 2: 'Medio', 3: 'Difícil' };
             connectSlot(1, username, 'A', true);
-            connectSlot(2, 'IA', 'B', false);
+            connectSlot(2, `IA (${diffLabels[difficulty] ?? 'Medio'})`, 'B', false);
             document.getElementById('my-team-badge').textContent = '⚽ Equipo A — vs IA';
-            addLog('Partida contra la IA iniciada');
+            addLog(`Partida contra la IA (${diffLabels[difficulty] ?? 'Medio'}) iniciada`);
             updateHUD();
             renderer.render();
+            audio.playGameStart();
         }
 
-        // ── Modo online: socket.io ────────────────────────────────
+        // ── Modo online: socket.io ────────────────────────────
         if (mode === 'online') {
             socket = io();
 
@@ -264,18 +523,16 @@
             // El servidor asigna nuestro equipo
             socket.on('team-assigned', ({ myTeam: assignedTeam, players }) => {
                 myTeam = assignedTeam;
-                renderer.myTeam = assignedTeam;  // actualizar renderer
+                renderer.myTeam = assignedTeam;
 
                 const badge = document.getElementById('my-team-badge');
                 badge.textContent = `⚽ Equipo ${assignedTeam}`;
                 badge.style.color = assignedTeam === 'A' ? 'var(--primary)' : '#7e8e48';
                 badge.style.borderColor = assignedTeam === 'A' ? 'var(--primary)' : '#7e8e48';
 
-                // Mi slot
                 const mySlot = assignedTeam === 'A' ? 1 : 2;
                 connectSlot(mySlot, username, assignedTeam, true);
 
-                // Rival ya conectado (si es el segundo en unirse)
                 for (const p of players) {
                     const rivalSlot = assignedTeam === 'A' ? 2 : 1;
                     connectSlot(rivalSlot, p.username, p.team, false);
@@ -286,13 +543,14 @@
                     addLog('Eres el Equipo A. Esperando oponente...');
                 } else {
                     addLog(`¡Partida lista! Eres el Equipo ${assignedTeam}`, 'success');
+                    audio.playGameStart();
                 }
 
                 updateHUD();
                 renderer.render();
             });
 
-            // Otro jugador se une
+            // Rival se une
             socket.on('player-joined', ({ socketId, username: joinedName, team, playerCount }) => {
                 if (socketId === socket.id) return;
                 const rivalSlot = myTeam === 'A' ? 2 : 1;
@@ -300,19 +558,21 @@
                 addLog(`${joinedName} se unió como Equipo ${team}`, 'success');
                 if (playerCount >= 2) {
                     addLog('¡Ambos conectados! Comienza la partida.', 'success');
+                    audio.playGameStart();
                     updateHUD();
                     renderer.render();
                 }
             });
 
-            // ── Recibir la acción del oponente y aplicarla ─────────
-            socket.on('opponent-action', ({ type, pieceId, targetRow, targetCol, fromTeam }) => {
+            // Recibir acción del oponente y aplicarla
+            socket.on('opponent-action', ({ type, pieceId, targetRow, targetCol, stealSuccess, fromTeam }) => {
+                if (gs.isOver()) return;
                 let result;
 
                 if (type === 'select-commit') {
-                    // 1. Seleccionar la pieza del rival en el GameState local
                     gs.selectPiece(pieceId);
-                    // 2. Ejecutar el movimiento
+                    // Si viene stealSuccess del sender, forzar ese resultado (sync determinista)
+                    if (stealSuccess !== undefined) gs._forcedStealSuccess = stealSuccess;
                     result = gs.commitAction(targetRow, targetCol);
                 } else if (type === 'commit-save') {
                     result = gs.commitSave(targetRow, targetCol);
@@ -320,13 +580,55 @@
 
                 if (result?.ok) {
                     addLog(`[${fromTeam}] ${result.event}`, result.goal ? 'success' : 'info');
+                    if (result.interception) {
+                        result.interception.success ? audio.playStealSuccess() : audio.playStealFail();
+                    } else if (result.goal) {
+                        audio.playGoal();
+                    } else if (result.saved) {
+                        audio.playSave();
+                    } else {
+                        audio.playOpponentMove();
+                    }
                     updateHUD();
                     renderer.render();
+                    if (result.gameOver) {
+                        renderer.locked = true;
+                        showGameOver(result.winner, result.score);
+                    }
                 }
             });
 
+            socket.on('self-play-error', ({ message }) => {
+                addLog(`⚠️ ${message}`);
+                setTimeout(() => { window.location.href = '/game/menu'; }, 2500);
+            });
+
             socket.on('player-left', ({ username: leftName, team }) => {
-                addLog(`${leftName} (Equipo ${team}) se desconectó`);
+                addLog(`${leftName} (Equipo ${team}) se desconectó`, 'warning');
+                // Si la partida no ha terminado, ganar por abandono
+                if (!gs.isOver() && myTeam) {
+                    renderer.locked = true;
+                    showGameOver(myTeam, gs.score, 'forfeit');
+                }
+            });
+
+            // Servidor confirma que el resultado fue guardado → mostrar cambio de ELO
+            socket.on('match-saved', ({ eloChanges }) => {
+                if (!eloChanges || !myTeam) return;
+                const change = eloChanges[myTeam];
+                if (!change) return;
+
+                const eloBox   = document.getElementById('go-elo');
+                const before   = document.getElementById('go-elo-before');
+                const after    = document.getElementById('go-elo-after');
+                const delta    = document.getElementById('go-elo-delta');
+
+                before.textContent = change.before;
+                after.textContent  = change.after;
+                const sign = change.delta >= 0 ? '+' : '';
+                delta.textContent  = `${sign}${change.delta}`;
+                delta.className    = `go-elo-delta ${change.delta >= 0 ? 'positive' : 'negative'}`;
+                eloBox.classList.add('visible');
             });
         }
     </script>

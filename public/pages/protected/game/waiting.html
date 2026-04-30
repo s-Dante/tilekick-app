@@ -152,6 +152,11 @@
         showMatchFound(data);
     });
 
+    socket.on('self-play-error', ({ message }) => {
+        addLog('⚠️', message, 'error');
+        setTimeout(() => { window.location.href = '/game/menu'; }, 2500);
+    });
+
     // 5. Cancelar búsqueda
     document.getElementById('cancel-btn').addEventListener('click', (e) => {
         e.preventDefault();

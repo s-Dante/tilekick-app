@@ -53,6 +53,7 @@ app.use(express.static(publicDir));
 
 app.use('/engine', express.static(path.join(__dirname, '..', 'engine')));
 app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
+app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
 
 // Multer — solo en memoria, sharp se encarga del disco
 const upload = multer({
@@ -83,6 +84,11 @@ db.connect((err) => {
         return;
     }
     console.log('Conectado a la base de datos');
+});
+
+// Manejar errores no fatales de la conexión para evitar que Node crashee
+db.on('error', (err) => {
+    console.error('[DB] Error de conexión:', err.message);
 });
 
 /**
@@ -730,8 +736,183 @@ app.get('/api/leaderboard', requireAuth, (req, res) => {
  *
  * Cola de espera: Map<key, { socketId, username }>
  * key = "map:gameType"
+ *
+ * activeRooms: Map<roomId, { map, gameType, matchId, matchCreating, finished,
+ *                            players: Map<socketId, { userId, team, username, eloBefore }> }>
  */
 const waitingQueue = new Map();
+const activeRooms  = new Map();
+
+// ── Helpers de ELO y resultados de partida ───────────────────
+
+/** Calcula nuevos ratings ELO (K=32). scoreA: 1=win, 0.5=draw, 0=loss para equipo A */
+function calcElo(rA, rB, scoreA) {
+    const eA = 1 / (1 + Math.pow(10, (rB - rA) / 400));
+    const newA = Math.round(rA + 32 * (scoreA - eA));
+    const newB = Math.round(rB + 32 * ((1 - scoreA) - (1 - eA)));
+    return { newA: Math.max(100, newA), newB: Math.max(100, newB) };
+}
+
+/** Crea los registros match + match_players en BD al empezar una partida */
+function _createMatchRecord(roomId, room) {
+    const now = new Date();
+    const gameTypeNum = room.gameType === '3d' ? 2 : 1;
+
+    db.query(
+        'INSERT INTO matches (room_id, map, game_type, mode, status, started_at, created_at, updated_at) VALUES (?,?,?,1,2,?,?,?)',
+        [roomId, room.map, gameTypeNum, now, now, now],
+        (err, result) => {
+            if (err) {
+                console.error('[Match] Error creando match:', err.message);
+                room.matchCreating = false;
+                return;
+            }
+            room.matchId = result.insertId;
+
+            // Obtener ELO de cada jugador y crear match_players
+            const players = [...room.players.values()].filter(p => p.userId);
+            let pending = players.length;
+            if (pending === 0) return;
+
+            for (const player of players) {
+                db.query(
+                    'SELECT COALESCE(elo_rating, 1000) AS elo FROM user_achievements WHERE user_id = ?',
+                    [player.userId],
+                    (err2, rows) => {
+                        const eloBefore = rows?.[0]?.elo ?? 1000;
+                        player.eloBefore = eloBefore;
+
+                        const teamNum = player.team === 'A' ? 1 : 2;
+                        db.query(
+                            'INSERT IGNORE INTO match_players (match_id, user_id, team, elo_before, created_at) VALUES (?,?,?,?,?)',
+                            [room.matchId, player.userId, teamNum, eloBefore, now],
+                            (err3) => { if (err3) console.error('[Match] Error creando match_player:', err3.message); }
+                        );
+
+                        if (--pending === 0) {
+                            console.log(`[Match] Partida ${room.matchId} iniciada — sala ${roomId} (${room.map})`);
+                        }
+                    }
+                );
+            }
+        }
+    );
+}
+
+/** Guarda el resultado final de una partida y actualiza stats/ELO */
+function _saveMatchResult(roomId, room, winnerTeam) {
+    if (room.finished) return;
+    room.finished = true;
+
+    if (!room.matchId) {
+        console.warn('[Match] No hay matchId para sala', roomId);
+        return;
+    }
+
+    const playerA = [...room.players.values()].find(p => p.team === 'A');
+    const playerB = [...room.players.values()].find(p => p.team === 'B');
+
+    if (!playerA?.userId || !playerB?.userId) {
+        // Sin IDs de usuario válidos — solo marcar partida como finalizada
+        const now = new Date();
+        db.query('UPDATE matches SET status=3, finished_at=?, updated_at=? WHERE id=?', [now, now, room.matchId]);
+        console.warn('[Match] Sin userId para sala', roomId, '— sólo se marcó el match como finalizado');
+        return;
+    }
+
+    // Obtener ELO actual de ambos jugadores
+    db.query(
+        'SELECT user_id, COALESCE(elo_rating, 1000) AS elo FROM user_achievements WHERE user_id IN (?,?)',
+        [playerA.userId, playerB.userId],
+        (err, rows) => {
+            if (err) console.error('[Match] Error obteniendo ELO:', err.message);
+
+            const eloMap = Object.fromEntries((rows ?? []).map(r => [r.user_id, r.elo]));
+            // mysql2 puede devolver strings — parsear explícitamente como enteros
+            const eloA = parseInt(eloMap[playerA.userId] ?? playerA.eloBefore ?? 1000, 10) || 1000;
+            const eloB = parseInt(eloMap[playerB.userId] ?? playerB.eloBefore ?? 1000, 10) || 1000;
+
+            // scoreA: 1=A gana, 0=B gana, 0.5=empate
+            const scoreA = winnerTeam === 'A' ? 1 : winnerTeam === 'B' ? 0 : 0.5;
+            const { newA, newB } = calcElo(eloA, eloB, scoreA);
+
+            // Validar que el cálculo produjo valores numéricos válidos
+            if (!Number.isFinite(newA) || !Number.isFinite(newB)) {
+                console.error(`[Match] Cálculo ELO inválido: eloA=${eloA} eloB=${eloB} scoreA=${scoreA} → newA=${newA} newB=${newB}`);
+                const now2 = new Date();
+                db.query('UPDATE matches SET status=3, winner_id=?, finished_at=?, updated_at=? WHERE id=?',
+                    [winnerTeam === 'A' ? playerA.userId : winnerTeam === 'B' ? playerB.userId : null, now2, now2, room.matchId]);
+                return;
+            }
+
+            const pointsA = scoreA === 1 ? 15 : scoreA === 0.5 ? 5 : 0;
+            const pointsB = scoreA === 0 ? 15 : scoreA === 0.5 ? 5 : 0;
+
+            // result: 1=win 2=loss 3=draw
+            const resultA = scoreA === 1 ? 1 : scoreA === 0.5 ? 3 : 2;
+            const resultB = scoreA === 0 ? 1 : scoreA === 0.5 ? 3 : 2;
+
+            const winnerUserId = winnerTeam === 'A' ? playerA.userId
+                               : winnerTeam === 'B' ? playerB.userId : null;
+            const now = new Date();
+
+            // 1. Actualizar matches
+            db.query(
+                'UPDATE matches SET status=3, winner_id=?, is_draw=?, finished_at=?, updated_at=? WHERE id=?',
+                [winnerUserId, winnerTeam ? 0 : 1, now, now, room.matchId]
+            );
+
+            // 2. Actualizar match_players
+            db.query(
+                'UPDATE match_players SET result=?, elo_after=?, points_earned=? WHERE match_id=? AND user_id=?',
+                [resultA, newA, pointsA, room.matchId, playerA.userId]
+            );
+            db.query(
+                'UPDATE match_players SET result=?, elo_after=?, points_earned=? WHERE match_id=? AND user_id=?',
+                [resultB, newB, pointsB, room.matchId, playerB.userId]
+            );
+
+            // 3. Actualizar user_achievements
+            _updateAchievements(playerA.userId, resultA === 1, resultA === 2, resultA === 3, newA, pointsA);
+            _updateAchievements(playerB.userId, resultB === 1, resultB === 2, resultB === 3, newB, pointsB);
+
+            console.log(`[Match] Guardado: sala=${roomId} id=${room.matchId} ganador=${winnerTeam ?? 'empate'} ELO_A:${eloA}→${newA} ELO_B:${eloB}→${newB}`);
+
+            // Notificar a los clientes con el cambio de ELO
+            io.to(roomId).emit('match-saved', {
+                winner: winnerTeam,
+                eloChanges: {
+                    A: { before: eloA, after: newA, delta: newA - eloA },
+                    B: { before: eloB, after: newB, delta: newB - eloB },
+                },
+            });
+        }
+    );
+}
+
+/** Actualiza wins/losses/draws/streak/ELO en user_achievements */
+function _updateAchievements(userId, isWin, isLoss, isDraw, newElo, points) {
+    // En MySQL, dentro del mismo SET, cada columna usa el valor YA actualizado.
+    // Así win_streak en best_streak ya tiene el valor incrementado.
+    const streakAndResult = isWin
+        ? 'wins        = wins + 1, win_streak = win_streak + 1, best_streak = GREATEST(best_streak, win_streak),'
+        : isLoss
+        ? 'losses      = losses + 1, win_streak = 0,'
+        : 'draws       = draws + 1, win_streak = 0,';
+
+    const sql = `
+        UPDATE user_achievements
+        SET elo_rating   = ?,
+            points       = points + ?,
+            ${streakAndResult}
+            total_games  = total_games + 1,
+            updated_at   = NOW()
+        WHERE user_id = ?
+    `;
+    db.query(sql, [newElo, points, userId], (err) => {
+        if (err) console.error(`[Achievements] Error userId=${userId}:`, err.message);
+    });
+}
 
 io.on('connection', (socket) => {
     console.log(`[Socket] Conectado: ${socket.id}`);
@@ -743,11 +924,27 @@ io.on('connection', (socket) => {
         const key = `${map}:${gameType}`;
         const waiting = waitingQueue.get(key);
 
+        // Evitar que el mismo usuario juegue contra sí mismo (misma sesión / misma pestaña)
+        if (waiting && waiting.username === username) {
+            socket.emit('self-play-error', { message: 'Ya estás buscando partida en esta modalidad. No puedes jugar contra ti mismo.' });
+            return;
+        }
+
         if (waiting) {
             waitingQueue.delete(key);
             socket.data.waitingKey = null;
 
             const roomId = randomUUID().slice(0, 8).toUpperCase();
+
+            // Inicializar sala en activeRooms para tracking de la partida
+            activeRooms.set(roomId, {
+                map,
+                gameType,
+                matchId: null,
+                matchCreating: false,
+                finished: false,
+                players: new Map(),
+            });
 
             socket.join(roomId);
             const opponentSocket = io.sockets.sockets.get(waiting.socketId);
@@ -807,18 +1004,10 @@ io.on('connection', (socket) => {
         }
 
         // Primer jugador → A, segundo → B
-        //      Podriamos despues hacerlo aleatorio
         const myTeam = existingPlayers.length === 0 ? 'A' : 'B';
         socket.data.team = myTeam;
 
-        // Le decimos a cada socket que equipo tiene
-        socket.emit('team-assigned', {
-            myTeam,
-            roomId,
-            players: existingPlayers,
-        });
-
-        // Avisamos que alguien entró
+        socket.emit('team-assigned', { myTeam, roomId, players: existingPlayers });
         io.to(roomId).emit('player-joined', {
             socketId: socket.id,
             username,
@@ -827,6 +1016,35 @@ io.on('connection', (socket) => {
         });
 
         console.log(`[Room ${roomId}] ${username} → Equipo ${myTeam} (${roomSize}/2)`);
+
+        // Buscar userId por username para registrar la partida en BD
+        db.query('SELECT id FROM users WHERE username = ?', [username], (err, rows) => {
+            const userId = rows?.[0]?.id ?? null;
+            socket.data.userId = userId;
+
+            const room = activeRooms.get(roomId);
+            if (!room) return; // sala no online (local / IA)
+
+            // Prevenir self-play: rechazar si el mismo userId ya está en la sala
+            if (userId) {
+                const alreadyPresent = [...room.players.values()].some(p => p.userId === userId);
+                if (alreadyPresent) {
+                    console.warn(`[Room ${roomId}] Self-play detectado — ${username} (${userId}) intentó unirse dos veces`);
+                    socket.emit('self-play-error', { message: 'No puedes jugar contra ti mismo.' });
+                    socket.leave(roomId);
+                    socket.data.roomId = null;
+                    return;
+                }
+            }
+
+            room.players.set(socket.id, { userId, team: myTeam, username });
+
+            // Cuando ambos jugadores estén registrados, crear la partida en BD
+            if (room.players.size === 2 && !room.matchId && !room.matchCreating) {
+                room.matchCreating = true;
+                _createMatchRecord(roomId, room);
+            }
+        });
     });
 
     // --- Relay de acciones del juego ---
@@ -840,6 +1058,17 @@ io.on('connection', (socket) => {
         });
 
         console.log(`[Room ${roomId}] ${socket.data.username} (${socket.data.team}): ${action.type}`);
+    });
+
+    // --- Resultado de la partida (emitido por los clientes al detectar gameOver) ---
+    socket.on('game-finished', ({ winnerTeam }) => {
+        const roomId = socket.data.roomId;
+        if (!roomId) return;
+        const room = activeRooms.get(roomId);
+        if (!room || room.finished) return;
+
+        console.log(`[Room ${roomId}] game-finished recibido — ganador: ${winnerTeam ?? 'empate'}`);
+        _saveMatchResult(roomId, room, winnerTeam);
     });
 
     // --- Desconexiones ---
@@ -857,6 +1086,28 @@ io.on('connection', (socket) => {
                 team: socket.data.team,
             });
             console.log(`[Room ${roomId}] ${socket.data.username} (${socket.data.team}) se desconectó`);
+
+            // Si la partida estaba activa, declarar ganador al jugador restante
+            const room = activeRooms.get(roomId);
+            if (room && !room.finished) {
+                const remainingSockets = io.sockets.adapter.rooms.get(roomId);
+                if (remainingSockets && remainingSockets.size > 0) {
+                    // Hay alguien en la sala → gana el jugador restante
+                    const winnerTeam = socket.data.team === 'A' ? 'B' : 'A';
+                    console.log(`[Room ${roomId}] Abandono — Equipo ${winnerTeam} gana por forfeit`);
+                    _saveMatchResult(roomId, room, winnerTeam);
+                } else {
+                    // Nadie en la sala → marcar como abandonada sin ganador
+                    if (room.matchId) {
+                        const now = new Date();
+                        db.query(
+                            'UPDATE matches SET status=4, finished_at=?, updated_at=? WHERE id=?',
+                            [now, now, room.matchId]
+                        );
+                    }
+                    activeRooms.delete(roomId);
+                }
+            }
         }
 
         console.log(`[Socket] Desconectado: ${socket.id}`);

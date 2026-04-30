@@ -37,7 +37,7 @@ export function getLegalMoves(piece, board, pieces) {
     if (piece.type === PIECE_TYPES.GOALKEEPER) {
         return _goalkeeperMoves(piece, board, occupied);
     }
-    return _fieldMoves(piece, board, occupied);
+    return _fieldMoves(piece, board, pieces);
 }
 
 /**
@@ -124,7 +124,8 @@ function _goalkeeperMoves(piece, board, occupied) {
 }
 
 /** Movimientos legales de jugadores de campo (defensas + delanteros) */
-function _fieldMoves(piece, board, occupied) {
+function _fieldMoves(piece, board, pieces) {
+    const occupied = buildOccupiedMap(pieces);
     const result = [];
 
     // Movimientos de 1 paso en las 8 direcciones
@@ -133,6 +134,13 @@ function _fieldMoves(piece, board, occupied) {
         const nc = piece.col + dc;
         if (_validTarget(nr, nc, board, occupied)) {
             result.push({ row: nr, col: nc });
+        } else if (board.isOnBoard(nr, nc) && !board.isGoalArea(nr, nc) && !board.isStomped(nr, nc)) {
+            // Comprobar si la casilla tiene un rival con el balón → robo
+            const key = `${nr},${nc}`;
+            const occupant = occupied.get(key);
+            if (occupant && occupant.team !== piece.team && occupant.hasBall) {
+                result.push({ row: nr, col: nc, action: 'steal' });
+            }
         }
     }
 

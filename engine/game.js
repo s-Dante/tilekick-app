@@ -20,8 +20,13 @@ export const PHASES = {
     MOVE: 'move',   // turno normal: el equipo activo mueve, pasa o dispara
     SHOOT: 'shoot',  // (interno, transición instantánea hacia SAVE)
     SAVE: 'save',   // el portero rival elige dónde posicionarse para atajar
-    OVER: 'over',   // partida terminada (futura extensión)
+    OVER: 'over',   // partida terminada
 };
+
+// ── Constantes de partida ────────────────────────────────────
+
+export const GOAL_LIMIT = 5;        // goles para ganar
+export const TURNS_TO_RESET = 30;   // turnos sin gol → resetear posiciones
 
 // ── Clase GameState ──────────────────────────────────────────
 
@@ -42,6 +47,15 @@ export class GameState {
         this.legalMoves = [];              // casillas resaltadas para la UI
         this.pendingShot = null;            // { shooterId, targetRow, targetCol }
         this.lastEvent = null;            // texto del último evento (para el log)
+
+        // Contadores de turno
+        this.globalTurns = 0;          // turnos totales jugados
+        this.turnsWithoutGoal = 0;     // turnos consecutivos sin gol (resetea posiciones)
+        this.winner = null;            // 'A' | 'B' cuando la partida termina
+
+        // Para sincronización online: forzar resultado de robo recibido del servidor
+        // Se setea externamente antes de commitAction(); se limpia tras usar.
+        this._forcedStealSuccess = null;
     }
 
     // ── Getters de conveniencia ──────────────────────────────
@@ -62,6 +76,10 @@ export class GameState {
         return this.pieces.filter(p => p.team === team);
     }
 
+    isOver() {
+        return this.phase === PHASES.OVER;
+    }
+
     // ── SELECCIONAR una pieza ────────────────────────────────
 
     /**
@@ -71,6 +89,9 @@ export class GameState {
      * @returns {{ ok, legalMoves?, reason? }}
      */
     selectPiece(pieceId) {
+        if (this.phase === PHASES.OVER) {
+            return { ok: false, reason: 'Partida terminada' };
+        }
         if (this.phase !== PHASES.MOVE) {
             return { ok: false, reason: 'Fase incorrecta' };
         }
@@ -103,7 +124,7 @@ export class GameState {
      * Ejecuta la acción correspondiente a la casilla destino.
      * Debe llamarse después de selectPiece().
      *
-     * @returns {{ ok, event?, phase?, goal?, saved?, interception?, reason? }}
+     * @returns {{ ok, event?, phase?, goal?, saved?, interception?, gameOver?, winner?, reason? }}
      */
     commitAction(targetRow, targetCol) {
         if (!this.selectedId) return { ok: false, reason: 'Ninguna pieza seleccionada' };
@@ -118,6 +139,7 @@ export class GameState {
 
         if (legal.action === 'shoot') return this._doShoot(piece, targetRow, targetCol);
         if (legal.action === 'pass') return this._doPass(piece, legal.pieceId);
+        if (legal.action === 'steal') return this._doSteal(piece, targetRow, targetCol);
         return this._doMove(piece, targetRow, targetCol);
     }
 
@@ -125,9 +147,8 @@ export class GameState {
 
     /**
      * El portero se posiciona en la casilla para atajar el disparo.
-     * Se determina si detuvo el balón comparando con la casilla del disparo.
      *
-     * @returns {{ ok, event?, goal?, saved?, scorer?, score?, reason? }}
+     * @returns {{ ok, event?, goal?, saved?, scorer?, score?, gameOver?, winner?, reason? }}
      */
     commitSave(targetRow, targetCol) {
         if (this.phase !== PHASES.SAVE) {
@@ -157,6 +178,7 @@ export class GameState {
             this.phase = PHASES.MOVE;
             // El turno se queda con el equipo del portero (ya fue seteado en _doShoot)
             this._clearSelection();
+            this._incrementTurns(false);
             return { ok: true, event: this.lastEvent, saved: true };
         } else {
             // Gol → contabilizar, reiniciar tablero/piezas y mantener score
@@ -165,24 +187,34 @@ export class GameState {
             this.lastEvent = `¡GOOOL! Equipo ${scoringTeam} anota • ${this.score.A}–${this.score.B}`;
 
             const savedScore = { ...this.score };
-            const savedMode = this.mode;
-            const savedTheme = this.board.theme;
 
-            // Reset completo: nuevo board + piezas en posición inicial
-            this.board = new Board(savedTheme);
-            this.pieces = buildInitialPieces();
-            this.pendingShot = null;
-            this.turn = 'A';
-            this.phase = PHASES.MOVE;
-            this.score = savedScore;
-            this._clearSelection();
+            // Reiniciar posiciones después de gol (board.reset() conserva el tema)
+            this._resetPositions(savedScore);
+
+            this.globalTurns++;
+            this.turnsWithoutGoal = 0; // gol = reset del contador
+
+            // Comprobar si alguien ganó
+            if (savedScore[scoringTeam] >= GOAL_LIMIT) {
+                this.phase = PHASES.OVER;
+                this.winner = scoringTeam;
+                return {
+                    ok: true,
+                    event: this.lastEvent,
+                    goal: true,
+                    scorer: scoringTeam,
+                    score: savedScore,
+                    gameOver: true,
+                    winner: scoringTeam,
+                };
+            }
 
             return {
                 ok: true,
                 event: this.lastEvent,
                 goal: true,
                 scorer: scoringTeam,
-                score: this.score,
+                score: savedScore,
             };
         }
     }
@@ -190,23 +222,6 @@ export class GameState {
     // ── Acciones privadas ────────────────────────────────────
 
     _doMove(piece, row, col) {
-        const targetPiece = this.getPieceAt(row, col);
-
-        // Si hay una pieza rival con el balón → intento de intercepción
-        if (targetPiece && targetPiece.team !== piece.team && targetPiece.hasBall) {
-            const result = resolveInterception(piece, targetPiece);
-            if (result.success) {
-                targetPiece.hasBall = false;
-                piece.hasBall = true;
-                this.lastEvent = `Intercepción (${result.probability}%) — ¡${piece.id} roba el balón!`;
-            } else {
-                this.lastEvent = `Intercepción fallida (${result.probability}%) — ${targetPiece.id} conserva el balón`;
-            }
-            this._endTurn();
-            return { ok: true, event: this.lastEvent, interception: result };
-        }
-
-        // Movimiento normal
         const prevRow = piece.row;
         const prevCol = piece.col;
         piece.row = row;
@@ -220,6 +235,32 @@ export class GameState {
         this.lastEvent = `${piece.id} se movió a (${row},${col})`;
         this._endTurn();
         return { ok: true, event: this.lastEvent };
+    }
+
+    _doSteal(piece, row, col) {
+        const targetPiece = this.getPieceAt(row, col);
+        if (!targetPiece || targetPiece.team === piece.team || !targetPiece.hasBall) {
+            return { ok: false, reason: 'No hay rival con balón en esa casilla' };
+        }
+
+        const result = resolveInterception(piece, targetPiece);
+
+        // Si hay un resultado forzado (recibido via sync online), respetarlo.
+        // Esto garantiza que ambos clientes apliquen exactamente el mismo resultado.
+        if (this._forcedStealSuccess !== null && this._forcedStealSuccess !== undefined) {
+            result.success = this._forcedStealSuccess;
+            this._forcedStealSuccess = null; // limpiar tras usar
+        }
+
+        if (result.success) {
+            targetPiece.hasBall = false;
+            piece.hasBall = true;
+            this.lastEvent = `⚡ Robo exitoso (${result.probability}%) — ¡${piece.id} roba el balón a ${targetPiece.id}!`;
+        } else {
+            this.lastEvent = `✋ Robo fallido (${result.probability}%) — ${targetPiece.id} conserva el balón`;
+        }
+        this._endTurn();
+        return { ok: true, event: this.lastEvent, interception: result };
     }
 
     _doShoot(piece, goalRow, goalCol) {
@@ -257,6 +298,36 @@ export class GameState {
         this._clearSelection();
         this.turn = this.turn === 'A' ? 'B' : 'A';
         this.phase = PHASES.MOVE;
+        this._incrementTurns(true);
+    }
+
+    /**
+     * Incrementa contadores de turno.
+     * @param {boolean} checkReset - Si debe comprobar el reset de 30 turnos
+     */
+    _incrementTurns(checkReset) {
+        this.globalTurns++;
+        this.turnsWithoutGoal++;
+
+        if (checkReset && this.turnsWithoutGoal >= TURNS_TO_RESET) {
+            const savedScore = { ...this.score };
+            this._resetPositions(savedScore);
+            this.turnsWithoutGoal = 0;
+            this.lastEvent = (this.lastEvent ? this.lastEvent + ' — ' : '') +
+                '⏱ ¡Reinicio! (30 turnos sin gol)';
+        }
+    }
+
+    _resetPositions(score) {
+        // Usamos board.reset() para conservar el tema/mapa visual;
+        // crear new Board() con el string del tema causaría selección aleatoria de mapa.
+        this.board.reset();
+        this.pieces = buildInitialPieces();
+        this.pendingShot = null;
+        this.turn = 'A';
+        this.phase = PHASES.MOVE;
+        this.score = score;
+        this._clearSelection();
     }
 
     _clearSelection() {
@@ -278,6 +349,9 @@ export class GameState {
             legalMoves: this.legalMoves,
             pendingShot: this.pendingShot,
             lastEvent: this.lastEvent,
+            globalTurns: this.globalTurns,
+            turnsWithoutGoal: this.turnsWithoutGoal,
+            winner: this.winner,
         };
     }
 
@@ -292,6 +366,9 @@ export class GameState {
         gs.legalMoves = data.legalMoves;
         gs.pendingShot = data.pendingShot;
         gs.lastEvent = data.lastEvent;
+        gs.globalTurns = data.globalTurns ?? 0;
+        gs.turnsWithoutGoal = data.turnsWithoutGoal ?? 0;
+        gs.winner = data.winner ?? null;
         return gs;
     }
 }

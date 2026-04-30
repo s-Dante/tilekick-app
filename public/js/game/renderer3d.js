@@ -2,7 +2,7 @@
 //  TILEKICK — Renderer 3D (Three.js)
 //  Clase: Renderer3D
 //
-//  Interacción: click/tap en casilla con Raycaster
+//  Interacción: click/tap → selección/acción; drag → orbitar cámara
 //
 //  Requiere Three.js en el importmap del HTML:
 //  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
@@ -12,19 +12,37 @@ import * as THREE from 'three';
 
 // ── Constantes de color ──────────────────────────────────────
 
-const TEAM_MAT = {
-    A: new THREE.MeshPhongMaterial({ color: 0x0d9488, shininess: 60 }),
-    B: new THREE.MeshPhongMaterial({ color: 0x65713a, shininess: 60 }),
+const TEAM_COLORS = {
+    A: 0x0d9488,
+    B: 0x65713a,
 };
 
-// Dimensiones de las cajas 3D por nivel de profundidad
-const CELL_HEIGHTS = [0.50, 0.30, 0.12]; // nivel 0, 1, 2
+// Alturas de las cajas 3D por nivel de profundidad (0→3)
+const CELL_HEIGHTS = [0.50, 0.35, 0.20, 0.06];
 
-// Colores del tablero — se actualizan según el mapa
+// Paleta del tablero por tema + nivel
 const PALETTE = {
-    grass: { level0: [0x22c55e, 0x4ade80], level1: [0x16a34a, 0x22c55e], level2: [0x14532d, 0x166534], goal: 0xe8e8e0 },
-    sand: { level0: [0xca8a04, 0xeab308], level1: [0xa16207, 0xca8a04], level2: [0x78350f, 0x92400e], goal: 0xe8e8e0 },
-    cement: { level0: [0x6b7280, 0x9ca3af], level1: [0x4b5563, 0x6b7280], level2: [0x1f2937, 0x374151], goal: 0xe8e8e0 },
+    grass: {
+        level0: [0x22c55e, 0x4ade80],
+        level1: [0x16a34a, 0x22c55e],
+        level2: [0x14532d, 0x166534],
+        level3: [0x052e16, 0x064e24],
+        goal: 0xe8e8e0,
+    },
+    sand: {
+        level0: [0xca8a04, 0xeab308],
+        level1: [0xa16207, 0xca8a04],
+        level2: [0x78350f, 0x92400e],
+        level3: [0x3b1a06, 0x4a2008],
+        goal: 0xe8e8e0,
+    },
+    cement: {
+        level0: [0x6b7280, 0x9ca3af],
+        level1: [0x4b5563, 0x6b7280],
+        level2: [0x1f2937, 0x374151],
+        level3: [0x0a0f14, 0x111827],
+        goal: 0xe8e8e0,
+    },
 };
 
 // ── Clase Renderer3D ─────────────────────────────────────────
@@ -34,14 +52,19 @@ export class Renderer3D {
      * @param {HTMLElement} container  — div que contiene el canvas 3D
      * @param {GameState}   gameState
      * @param {object}      opts
-     * @param {Function}    opts.onAction — callback tras acción exitosa
-     * @param {Function}    opts.onLog    — callback para log
+     * @param {string}      opts.myTeam    — 'A' | 'B' | null
+     * @param {Function}    opts.onAction  — callback tras acción exitosa
+     * @param {Function}    opts.onLog     — callback para log
      */
-    constructor(container, gameState, { onAction = null, onLog = null } = {}) {
+    constructor(container, gameState, { myTeam = null, onAction = null, onLog = null } = {}) {
         this.container = container;
         this.gs = gameState;
+        this.myTeam = myTeam;
         this.onAction = onAction;
         this.onLog = onLog;
+
+        // Bloqueo de input (ej. turno IA)
+        this.locked = false;
 
         // Objetos Three.js
         this.scene = null;
@@ -50,10 +73,25 @@ export class Renderer3D {
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
 
-        // Mapas de meshes para actualización eficiente
-        this.cellMeshes = new Map(); // key `${row},${col}` → Mesh
+        // Mapas de meshes
+        this.cellMeshes = new Map();  // `${row},${col}` → Mesh
         this.pieceMeshes = new Map(); // pieceId → Mesh
-        this.highlights = [];        // Meshes de resaltado
+        this.highlights = [];
+
+        // Orbit camera
+        // Eje X del tablero: 0-4 → centro X = 2
+        // Eje Z del tablero: 0-9 → centro Z = 4.5
+        this.orbitCX = 2;
+        this.orbitCZ = 4.5;
+        this.orbitRadius = 13;
+        this.orbitHeight = 9;
+        // Ángulo de órbita: 0 = vista desde Team B (detrás de fila 9)
+        //                   π = vista desde Team A (detrás de fila 0)
+        // Team A ve sus piezas abajo → ángulo π; Team B → ángulo 0
+        this.orbitAngle = (myTeam === 'B') ? 0 : Math.PI;
+
+        // Estado del drag para orbitar
+        this._drag = null; // { startX, totalDelta }
 
         this._init();
         this._buildBoard();
@@ -71,27 +109,58 @@ export class Renderer3D {
         // Escena
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x0a0e15);
+        // Niebla sutil para profundidad
+        this.scene.fog = new THREE.Fog(0x0a0e15, 20, 40);
 
-        // Cámara perspectiva isométrica
+        // Cámara perspectiva
         this.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-        this.camera.position.set(2, 9, 14);
-        this.camera.lookAt(2, 0, 4.5);
+        this._updateCamera();
 
-        // Renderer
+        // Renderer WebGL
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setSize(w, h);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.container.appendChild(this.renderer.domElement);
 
-        // Luces
-        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-        this.scene.add(ambient);
+        // ── Iluminación estilizada ───────────────────────────
+        // Luz hemisférica: simula cielo + suelo con tono cálido/frío
+        const hemi = new THREE.HemisphereLight(0x87ceeb, 0x7c5c3a, 0.7);
+        this.scene.add(hemi);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(4, 10, 6);
-        this.scene.add(dirLight);
+        // Luz direccional principal (sol)
+        const sun = new THREE.DirectionalLight(0xfff5e0, 1.2);
+        sun.position.set(6, 12, 8);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 1024;
+        sun.shadow.mapSize.height = 1024;
+        sun.shadow.camera.near = 0.5;
+        sun.shadow.camera.far = 30;
+        sun.shadow.camera.left = -8;
+        sun.shadow.camera.right = 8;
+        sun.shadow.camera.top = 12;
+        sun.shadow.camera.bottom = -4;
+        this.scene.add(sun);
+
+        // Luz de relleno (sombra suave desde el otro lado)
+        const fill = new THREE.DirectionalLight(0x4466aa, 0.35);
+        fill.position.set(-4, 6, -6);
+        this.scene.add(fill);
 
         window.addEventListener('resize', () => this._onResize());
+    }
+
+    // ── Cámara (órbita) ───────────────────────────────────────
+
+    _updateCamera() {
+        const { orbitCX: cx, orbitCZ: cz, orbitRadius: r, orbitHeight: h, orbitAngle: a } = this;
+        this.camera.position.set(
+            cx + r * Math.sin(a),
+            h,
+            cz + r * Math.cos(a)
+        );
+        this.camera.lookAt(cx, 0, cz);
     }
 
     // ── Construcción del tablero ──────────────────────────────
@@ -105,16 +174,19 @@ export class Renderer3D {
                 if (!board.isOnBoard(row, col)) continue;
 
                 const level = board.getLevel(row, col);
-                const height = CELL_HEIGHTS[level];
+                const height = CELL_HEIGHTS[Math.min(level, 3)];
                 const isGoal = board.isGoalArea(row, col);
                 const hexColor = isGoal
                     ? palette.goal
-                    : (palette[`level${level}`] ?? palette.level0)[(row + col) % 2];
+                    : (palette[`level${Math.min(level, 3)}`] ?? palette.level0)[(row + col) % 2];
 
-                const material = new THREE.MeshPhongMaterial({ color: hexColor, shininess: 20 });
-                const geometry = new THREE.BoxGeometry(0.92, height, 0.92);
+                // Tiles ligeramente separadas (0.85 en lugar de 0.92 → gap de 0.15)
+                const geometry = new THREE.BoxGeometry(0.85, height, 0.85);
+                const material = new THREE.MeshPhongMaterial({ color: hexColor, shininess: 25 });
                 const mesh = new THREE.Mesh(geometry, material);
 
+                mesh.castShadow = false;
+                mesh.receiveShadow = true;
                 mesh.position.set(col, height / 2, row);
                 mesh.userData = { type: 'cell', row, col };
 
@@ -133,28 +205,29 @@ export class Renderer3D {
     }
 
     _createPieceMesh(piece) {
-        const mat = TEAM_MAT[piece.team].clone();
+        const color = TEAM_COLORS[piece.team];
+        const mat = new THREE.MeshPhongMaterial({ color, shininess: 70 });
         const geo = new THREE.CylinderGeometry(0.28, 0.28, 0.5, 16);
         const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
         mesh.userData = { type: 'piece', pieceId: piece.id };
 
         this._positionPiece(mesh, piece);
         this.scene.add(mesh);
         this.pieceMeshes.set(piece.id, mesh);
 
-        // Esfera pequeña del balón sobre la pieza
-        if (piece.hasBall) this._addBallIndicator(mesh, piece);
+        if (piece.hasBall) this._addBallIndicator(mesh);
     }
 
     _positionPiece(mesh, piece) {
         const level = this.gs.board.getLevel(piece.row, piece.col);
-        const cellTop = CELL_HEIGHTS[level];
+        const cellTop = CELL_HEIGHTS[Math.min(level, 3)];
         mesh.position.set(piece.col, cellTop + 0.25, piece.row);
     }
 
-    _addBallIndicator(pieceMesh, piece) {
+    _addBallIndicator(pieceMesh) {
         const geo = new THREE.SphereGeometry(0.1, 12, 8);
-        const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 80 });
+        const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 100 });
         const ball = new THREE.Mesh(geo, mat);
         ball.position.set(0.25, 0.35, 0);
         ball.userData = { isBall: true };
@@ -171,18 +244,19 @@ export class Renderer3D {
     _showHighlights() {
         this._clearHighlights();
         const ACTION_COLORS_3D = {
-            move: 0x0d9488,
+            move:  0x0d9488,
             shoot: 0xef4444,
-            pass: 0x6366f1,
+            pass:  0x6366f1,
+            steal: 0xf97316, // naranja
         };
 
         for (const move of this.gs.legalMoves) {
             const level = this.gs.board.getLevel(move.row, move.col);
-            const height = CELL_HEIGHTS[level];
+            const height = CELL_HEIGHTS[Math.min(level, 3)];
             const color = ACTION_COLORS_3D[move.action ?? 'move'];
 
-            const geo = new THREE.BoxGeometry(0.92, 0.04, 0.92);
-            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 });
+            const geo = new THREE.BoxGeometry(0.85, 0.04, 0.85);
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.65 });
             const mesh = new THREE.Mesh(geo, mat);
 
             mesh.position.set(move.col, height + 0.02, move.row);
@@ -196,32 +270,52 @@ export class Renderer3D {
     // ── Actualizar estado del juego en la escena ─────────────
 
     updateScene() {
-        // Actualizar posiciones de piezas
+        const board = this.gs.board;
+        const palette = PALETTE[board.theme] ?? PALETTE.grass;
+
+        // Actualizar posiciones + estado de piezas
         for (const piece of this.gs.pieces) {
             const mesh = this.pieceMeshes.get(piece.id);
             if (!mesh) continue;
 
             this._positionPiece(mesh, piece);
 
-            // Color del seleccionado
+            // Emisivo en pieza seleccionada
             mesh.material.emissive.set(
                 piece.id === this.gs.selectedId ? 0xfbbf24 : 0x000000
             );
-            mesh.material.emissiveIntensity = piece.id === this.gs.selectedId ? 0.3 : 0;
+            mesh.material.emissiveIntensity = piece.id === this.gs.selectedId ? 0.4 : 0;
 
-            // Quitar/añadir indicador de balón
+            // Piezas rivales (online) → ligeramente translúcidas
+            if (this.myTeam !== null && piece.team !== this.myTeam) {
+                mesh.material.transparent = true;
+                mesh.material.opacity = 0.72;
+            } else {
+                mesh.material.transparent = false;
+                mesh.material.opacity = 1;
+            }
+
+            // Indicador de balón
             const existing = mesh.children.find(c => c.userData.isBall);
-            if (piece.hasBall && !existing) this._addBallIndicator(mesh, piece);
+            if (piece.hasBall && !existing) this._addBallIndicator(mesh);
             if (!piece.hasBall && existing) mesh.remove(existing);
         }
 
         // Actualizar profundidades del tablero
         for (const [key, mesh] of this.cellMeshes) {
             const [row, col] = key.split(',').map(Number);
-            const level = this.gs.board.getLevel(row, col);
-            const height = CELL_HEIGHTS[level];
-            mesh.scale.y = height / CELL_HEIGHTS[0]; // escalar el alto
+            const level = board.getLevel(row, col);
+            const height = CELL_HEIGHTS[Math.min(level, 3)];
+            const isGoal = board.isGoalArea(row, col);
+            const hexColor = isGoal
+                ? palette.goal
+                : (palette[`level${Math.min(level, 3)}`] ?? palette.level0)[(row + col) % 2];
+
+            // Redimensionar Y
+            const baseH = CELL_HEIGHTS[0];
+            mesh.scale.y = height / baseH;
             mesh.position.y = height / 2;
+            mesh.material.color.setHex(hexColor);
         }
 
         // Resaltados
@@ -229,21 +323,55 @@ export class Renderer3D {
         else this._clearHighlights();
     }
 
-    // ── Interacción (click / tap) ─────────────────────────────
+    // ── Interacción: órbita + click ───────────────────────────
 
     _bindEvents() {
         const domEl = this.renderer.domElement;
-        domEl.addEventListener('pointerdown', e => this._onPointer(e));
+        domEl.addEventListener('pointerdown',  e => this._onPointerDown(e));
+        domEl.addEventListener('pointermove',  e => this._onPointerMove(e));
+        domEl.addEventListener('pointerup',    e => this._onPointerUp(e));
+        domEl.addEventListener('pointerleave', () => { this._drag = null; });
     }
 
-    _onPointer(e) {
+    _onPointerDown(e) {
+        this._drag = { startX: e.clientX, startY: e.clientY, moved: false };
+    }
+
+    _onPointerMove(e) {
+        if (!this._drag) return;
+        const dx = e.clientX - this._drag.startX;
+        const dy = e.clientY - this._drag.startY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+            this._drag.moved = true;
+        }
+        if (this._drag.moved) {
+            // Rotar cámara horizontalmente
+            this.orbitAngle += dx * 0.006;
+            this._drag.startX = e.clientX;
+            this._drag.startY = e.clientY;
+            this._updateCamera();
+        }
+    }
+
+    _onPointerUp(e) {
+        if (!this._drag) return;
+        const wasDrag = this._drag.moved;
+        this._drag = null;
+        if (!wasDrag) {
+            this._handleClick(e);
+        }
+    }
+
+    _handleClick(e) {
+        if (this.locked) return;
+
         const rect = this.renderer.domElement.getBoundingClientRect();
         this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
         this.raycaster.setFromCamera(this.pointer, this.camera);
 
-        // Primero intentar click en resaltado (acción)
+        // 1. Click en resaltado → ejecutar acción
         const hlHits = this.raycaster.intersectObjects(this.highlights);
         if (hlHits.length > 0) {
             const { row, col } = hlHits[0].object.userData;
@@ -251,22 +379,25 @@ export class Renderer3D {
             return;
         }
 
-        // Click en pieza — seleccionar
+        // 2. Click en pieza → seleccionar
         const pieceMeshes = [...this.pieceMeshes.values()];
         const pieceHits = this.raycaster.intersectObjects(pieceMeshes, true);
         if (pieceHits.length > 0) {
             let obj = pieceHits[0].object;
-            // Subir hasta el mesh con pieceId
             while (obj && !obj.userData.pieceId) obj = obj.parent;
             if (obj?.userData.pieceId) {
                 const gs = this.gs;
+                // En online, solo actúas si es tu turno
+                const piece = gs.getPiece(obj.userData.pieceId);
+                if (this.myTeam !== null && piece?.team !== this.myTeam) return;
+
                 const result = gs.selectPiece(obj.userData.pieceId);
                 if (result.ok) this.updateScene();
             }
             return;
         }
 
-        // Click en celda de tablero (durante fase SAVE o como fallback)
+        // 3. Click en celda → commit (ej. portero en save)
         const cellMeshes = [...this.cellMeshes.values()];
         const cellHits = this.raycaster.intersectObjects(cellMeshes);
         if (cellHits.length > 0) {
@@ -276,11 +407,15 @@ export class Renderer3D {
     }
 
     _commitTo(row, col) {
+        if (this.locked) return;
         const gs = this.gs;
 
         if (gs.phase === 'save') {
+            // En online, solo el portero del equipo activo puede atajar
+            if (this.myTeam !== null && gs.turn !== this.myTeam) return;
             const result = gs.commitSave(row, col);
             if (result.ok) {
+                result._sync = { type: 'commit-save', targetRow: row, targetCol: col };
                 this.onLog?.(result.event);
                 this.onAction?.(result);
                 this.updateScene();
@@ -288,8 +423,17 @@ export class Renderer3D {
             return;
         }
 
+        const selectedIdBeforeCommit = gs.selectedId; // capturar ANTES de que commitAction limpie
         const result = gs.commitAction(row, col);
         if (result.ok) {
+            // Incluir stealSuccess para sincronización online determinista
+            result._sync = {
+                type: 'select-commit',
+                pieceId: selectedIdBeforeCommit,
+                targetRow: row,
+                targetCol: col,
+                ...(result.interception !== undefined ? { stealSuccess: result.interception.success } : {}),
+            };
             this.onLog?.(result.event);
             this.onAction?.(result);
             this.updateScene();
@@ -300,7 +444,6 @@ export class Renderer3D {
 
     _animate() {
         requestAnimationFrame(() => this._animate());
-        // Rotación suave del tablero (sutil)
         this.renderer.render(this.scene, this.camera);
     }
 

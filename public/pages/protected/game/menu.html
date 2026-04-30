@@ -157,6 +157,43 @@
                     </div>
                 </div>
 
+                <!-- Sección 4: Dificultad IA (solo visible en modo IA) -->
+                <div class="menu-section" id="ai-difficulty-section" style="display:none;">
+                    <h2 class="section-title">4. Dificultad de la IA</h2>
+                    <div class="selection-grid">
+                        <label class="selection-card">
+                            <input type="radio" name="difficulty" value="1" checked>
+                            <div class="card-content">
+                                <span class="card-icon">😊</span>
+                                <div class="card-text">
+                                    <span class="card-title">Fácil</span>
+                                    <span class="card-desc">Movimientos aleatorios</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="difficulty" value="2">
+                            <div class="card-content">
+                                <span class="card-icon">🧠</span>
+                                <div class="card-text">
+                                    <span class="card-title">Medio</span>
+                                    <span class="card-desc">Prioriza meter gol</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="difficulty" value="3">
+                            <div class="card-content">
+                                <span class="card-icon">💀</span>
+                                <div class="card-text">
+                                    <span class="card-title">Difícil</span>
+                                    <span class="card-desc">Defensivo y estratégico</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="submit-bar">
                     <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">Buscar partida</button>
                 </div>
@@ -170,6 +207,18 @@
     <script src="/js/components/toast.js"></script>
     <script src="/scripts/sidebar.js"></script>
     <script>
+        const aiDiffSection = document.getElementById('ai-difficulty-section');
+
+        // Mostrar/ocultar sección de dificultad según el modo seleccionado
+        document.querySelectorAll('input[name="mode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const mode = radio.value;
+                const btn = document.getElementById('submitBtn');
+                btn.textContent = mode === 'online' ? 'Buscar partida' : 'Jugar ahora';
+                aiDiffSection.style.display = mode === 'ai' ? 'block' : 'none';
+            });
+        });
+
         document.getElementById('gameMenuForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const form = e.target;
@@ -184,19 +233,18 @@
 
             const params = new URLSearchParams({ mode, map, gameType });
 
+            // Añadir dificultad si es modo IA
+            if (mode === 'ai') {
+                const difficulty = form.querySelector('input[name="difficulty"]:checked')?.value ?? '2';
+                params.set('difficulty', difficulty);
+            }
+
             if (mode === 'online') {
                 window.location.href = `/game/waiting?${params.toString()}`;
             } else {
                 const dest = gameType === '3d' ? '/game/3d' : '/game/2d';
                 window.location.href = `${dest}?${params.toString()}`;
             }
-        });
-
-        document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const btn = document.getElementById('submitBtn');
-                btn.textContent = radio.value === 'online' ? 'Buscar partida' : 'Jugar ahora';
-            });
         });
     </script>
 </body>

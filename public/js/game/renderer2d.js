@@ -3,6 +3,7 @@
 //  Clase: Renderer2D
 //
 //  Interacción: Drag & Drop con soporte táctil
+//  Flip de tablero: Team A siempre aparece en la parte inferior
 //
 //  Importar como módulo ES en el HTML:
 //    import { Renderer2D } from '/js/game/renderer2d.js';
@@ -16,9 +17,10 @@ const TEAM_COLORS = {
 };
 
 const ACTION_COLORS = {
-    move: { overlay: 'rgba(13, 148, 136, 0.35)', dot: '#0d9488' },
-    shoot: { overlay: 'rgba(239, 68, 68, 0.35)', dot: '#ef4444' },
-    pass: { overlay: 'rgba(99, 102, 241, 0.35)', dot: '#6366f1' },
+    move:  { overlay: 'rgba(13, 148, 136, 0.35)',  dot: '#0d9488' },
+    shoot: { overlay: 'rgba(239, 68, 68, 0.35)',   dot: '#ef4444' },
+    pass:  { overlay: 'rgba(99, 102, 241, 0.35)',  dot: '#6366f1' },
+    steal: { overlay: 'rgba(251, 146, 60, 0.45)',  dot: '#f97316' }, // naranja — robo
 };
 
 export class Renderer2D {
@@ -26,7 +28,7 @@ export class Renderer2D {
      * @param {HTMLCanvasElement} canvas
      * @param {GameState}         gameState
      * @param {object}            opts
-     * @param {string}            opts.myTeam    — 'A' | 'B' | null (null = local, ambas visibles igualmente)
+     * @param {string}            opts.myTeam    — 'A' | 'B' | null (local)
      * @param {Function}          opts.onAction  — llamada tras cada acción exitosa
      * @param {Function}          opts.onLog     — llamada para añadir texto al log
      */
@@ -34,12 +36,15 @@ export class Renderer2D {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gs = gameState;
-        this.myTeam = myTeam;   // null = modo local (ambos equipos son "míos")
+        this.myTeam = myTeam;   // null = modo local
         this.onAction = onAction;
         this.onLog = onLog;
 
         // Estado del drag
         this.dragging = null; // { piece, currentX, currentY }
+
+        // Bloqueo (ej. durante turno IA)
+        this.locked = false;
 
         // Layout
         this.cellSize = 0;
@@ -49,6 +54,27 @@ export class Renderer2D {
         this._resize();
         this._bindEvents();
         window.addEventListener('resize', () => this._resize());
+    }
+
+    // ── Flip del tablero ──────────────────────────────────────
+    //
+    // Regla: Team A y modo local → tablero invertido (fila 0 abajo, fila 9 arriba).
+    //        Team B (online)     → sin invertir (fila 9 abajo = B's territory at bottom).
+    //
+    // Esto hace que siempre veas tus piezas en la parte inferior.
+
+    get _flipBoard() {
+        return this.myTeam !== 'B';
+    }
+
+    /** Convierte fila lógica → fila de display */
+    _toDisplayRow(logicalRow) {
+        return this._flipBoard ? (9 - logicalRow) : logicalRow;
+    }
+
+    /** Convierte fila de display → fila lógica */
+    _toLogicalRow(displayRow) {
+        return this._flipBoard ? (9 - displayRow) : displayRow;
     }
 
     // ── Layout ───────────────────────────────────────────────
@@ -94,8 +120,9 @@ export class Renderer2D {
             for (let col = 0; col < 5; col++) {
                 if (!board.isOnBoard(row, col)) continue;
 
+                const dispRow = this._toDisplayRow(row);
                 const x = offsetX + col * cellSize;
-                const y = offsetY + row * cellSize;
+                const y = offsetY + dispRow * cellSize;
                 const color = board.getCellColor(row, col);
                 const level = board.getLevel(row, col);
 
@@ -105,8 +132,20 @@ export class Renderer2D {
 
                 // Efecto de hundimiento en casillas pisadas
                 if (level > 0) {
-                    ctx.fillStyle = `rgba(0, 0, 0, ${level * 0.18})`;
+                    ctx.fillStyle = `rgba(0, 0, 0, ${level * 0.14})`;
                     ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+                }
+
+                // Casilla impasable (nivel 3): patrón diagonal
+                if (level >= 3) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+                    ctx.fillRect(x, y, cellSize, cellSize);
+                    ctx.strokeStyle = 'rgba(255,100,100,0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y); ctx.lineTo(x + cellSize, y + cellSize);
+                    ctx.moveTo(x + cellSize, y); ctx.lineTo(x, y + cellSize);
+                    ctx.stroke();
                 }
 
                 // Borde de la casilla
@@ -130,8 +169,9 @@ export class Renderer2D {
         const { ctx, cellSize, offsetX, offsetY } = this;
 
         for (const move of this.gs.legalMoves) {
+            const dispRow = this._toDisplayRow(move.row);
             const x = offsetX + move.col * cellSize;
-            const y = offsetY + move.row * cellSize;
+            const y = offsetY + dispRow * cellSize;
             const key = move.action ?? 'move';
             const col = ACTION_COLORS[key] ?? ACTION_COLORS.move;
 
@@ -151,11 +191,11 @@ export class Renderer2D {
 
     _drawPieces() {
         for (const piece of this.gs.pieces) {
-            // La pieza siendo arrastrada se dibuja en su posición del cursor
             if (this.dragging?.piece.id === piece.id) continue;
 
+            const dispRow = this._toDisplayRow(piece.row);
             const x = this.offsetX + piece.col * this.cellSize + this.cellSize / 2;
-            const y = this.offsetY + piece.row * this.cellSize + this.cellSize / 2;
+            const y = this.offsetY + dispRow * this.cellSize + this.cellSize / 2;
             const r = this.cellSize * 0.36;
             const sel = piece.id === this.gs.selectedId;
             this._drawPieceAt(x, y, r, piece, sel);
@@ -167,10 +207,10 @@ export class Renderer2D {
         const isOwn = this.myTeam === null || piece.team === this.myTeam;
         const colors = TEAM_COLORS[piece.team];
 
-        // Piezas rivales: ligeramente translúcidas para indicar que no las controlas
+        // Piezas rivales: ligeramente translúcidas
         ctx.globalAlpha = isOwn ? 1 : 0.72;
 
-        // Anillo de selección (solo piezas tuyas)
+        // Anillo de selección
         if (selected && isOwn) {
             ctx.beginPath();
             ctx.arc(x, y, r + 5, 0, Math.PI * 2);
@@ -184,7 +224,6 @@ export class Renderer2D {
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fillStyle = colors.fill;
         ctx.fill();
-        // Borde más brillante en piezas propias
         ctx.strokeStyle = isOwn ? colors.stroke : '#555';
         ctx.lineWidth = isOwn ? 2.5 : 1.5;
         ctx.stroke();
@@ -198,7 +237,7 @@ export class Renderer2D {
             ctx.fillText('★', x, y - r - 7);
         }
 
-        // Indicador del balón (punto blanco, esquina superior derecha)
+        // Indicador del balón (punto blanco)
         if (piece.hasBall) {
             ctx.beginPath();
             ctx.arc(x + r * 0.55, y - r * 0.55, r * 0.28, 0, Math.PI * 2);
@@ -216,14 +255,12 @@ export class Renderer2D {
         ctx.font = `bold ${Math.max(9, Math.round(r * 0.52))}px Inter, system-ui, sans-serif`;
         ctx.fillText(piece.label, x, y);
 
-        // Restaurar opacidad
         ctx.globalAlpha = 1;
     }
 
     _drawDragPiece() {
         const { piece, currentX, currentY } = this.dragging;
         const r = this.cellSize * 0.36;
-        // Un poco más transparente mientras se arrastra
         this.ctx.globalAlpha = 0.85;
         this._drawPieceAt(currentX, currentY, r, piece, false);
         this.ctx.globalAlpha = 1;
@@ -233,12 +270,12 @@ export class Renderer2D {
 
     _bindEvents() {
         const c = this.canvas;
-        c.addEventListener('mousedown', e => this._onDown(this._canvasPos(e)));
-        c.addEventListener('mousemove', e => this._onMove(this._canvasPos(e)));
-        c.addEventListener('mouseup', e => this._onUp(this._canvasPos(e)));
+        c.addEventListener('mousedown',  e => this._onDown(this._canvasPos(e)));
+        c.addEventListener('mousemove',  e => this._onMove(this._canvasPos(e)));
+        c.addEventListener('mouseup',    e => this._onUp(this._canvasPos(e)));
         c.addEventListener('touchstart', e => { e.preventDefault(); this._onDown(this._touchPos(e)); }, { passive: false });
-        c.addEventListener('touchmove', e => { e.preventDefault(); this._onMove(this._touchPos(e)); }, { passive: false });
-        c.addEventListener('touchend', e => { e.preventDefault(); this._onUp(this._touchPos(e)); }, { passive: false });
+        c.addEventListener('touchmove',  e => { e.preventDefault(); this._onMove(this._touchPos(e)); }, { passive: false });
+        c.addEventListener('touchend',   e => { e.preventDefault(); this._onUp(this._touchPos(e)); }, { passive: false });
     }
 
     _canvasPos(e) {
@@ -253,25 +290,24 @@ export class Renderer2D {
     }
 
     _screenToCell({ x, y }) {
-        return {
-            row: Math.floor((y - this.offsetY) / this.cellSize),
-            col: Math.floor((x - this.offsetX) / this.cellSize),
-        };
+        const displayRow = Math.floor((y - this.offsetY) / this.cellSize);
+        const col = Math.floor((x - this.offsetX) / this.cellSize);
+        const row = this._toLogicalRow(displayRow);
+        return { row, col };
     }
 
     _onDown({ x, y }) {
+        if (this.locked) return;
         const gs = this.gs;
         const { row, col } = this._screenToCell({ x, y });
 
         // Fase SAVE → el portero elige dónde posicionarse
         if (gs.phase === 'save') {
-            // Solo el equipo que debe atajar puede actuar
             if (this.myTeam !== null && gs.turn !== this.myTeam) return;
             const legal = gs.legalMoves.find(m => m.row === row && m.col === col);
             if (legal) {
                 const result = gs.commitSave(row, col);
                 if (result.ok) {
-                    // Incluir datos de sincronización para modo online
                     result._sync = { type: 'commit-save', targetRow: row, targetCol: col };
                     this.onLog?.(result.event);
                     this.onAction?.(result);
@@ -281,7 +317,7 @@ export class Renderer2D {
             return;
         }
 
-        // Fase MOVE → solo puedes seleccionar piezas de tu equipo
+        // Fase MOVE → seleccionar pieza del equipo activo
         const piece = gs.getPieceAt(row, col);
         if (piece && piece.team === gs.turn) {
             // En modo online, solo actúas si es tu turno
@@ -305,13 +341,20 @@ export class Renderer2D {
     _onUp({ x, y }) {
         if (!this.dragging) return;
 
-        const pieceId = this.dragging.piece.id;  // capturar ANTES de limpiar
+        const pieceId = this.dragging.piece.id;
         const { row, col } = this._screenToCell({ x, y });
         const result = this.gs.commitAction(row, col);
 
         if (result.ok) {
-            // Adjuntar datos de sincronización para el modo online
-            result._sync = { type: 'select-commit', pieceId, targetRow: row, targetCol: col };
+            // Incluir stealSuccess en el sync para que el oponente aplique
+            // exactamente el mismo resultado (evita divergencia por Math.random)
+            result._sync = {
+                type: 'select-commit',
+                pieceId,
+                targetRow: row,
+                targetCol: col,
+                ...(result.interception !== undefined ? { stealSuccess: result.interception.success } : {}),
+            };
             this.onLog?.(result.event);
             this.onAction?.(result);
         }
