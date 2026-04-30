@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TileKick — Crear cuenta</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <link rel="stylesheet" href="/styles/auth/auth.css">
 </head>
 
@@ -52,9 +53,7 @@
                        placeholder="Repite tu contraseña" autocomplete="new-password">
             </div>
 
-            <p id="errorMsg" class="error-msg"></p>
-
-            <button type="submit" class="btn btn-primary btn-submit">Crear cuenta</button>
+            <button type="submit" id="registerBtn" class="btn btn-primary btn-submit">Crear cuenta</button>
 
         </form>
 
@@ -64,11 +63,13 @@
 
     </div>
 
+    <script src="/js/components/toast.js"></script>
     <script>
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        const form = document.getElementById('registerForm');
+        const btn  = document.getElementById('registerBtn');
+
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const errorMsg = document.getElementById('errorMsg');
-            errorMsg.style.display = 'none';
 
             const body = {
                 name:            document.getElementById('name').value.trim(),
@@ -78,20 +79,46 @@
                 confirmPassword: document.getElementById('confirmPassword').value,
             };
 
-            const res  = await fetch('/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            const data = await res.json();
-
-            if (!res.ok) {
-                errorMsg.textContent   = data.error || 'Error al registrarse';
-                errorMsg.style.display = 'block';
+            if (!body.name || !body.username || !body.email || !body.password || !body.confirmPassword) {
+                Toast.warning('Por favor completa todos los campos.', { position: 'top-center' });
                 return;
             }
 
-            window.location.href = '/login';
+            if (body.password !== body.confirmPassword) {
+                Toast.error('Las contraseñas no coinciden.', { position: 'top-center' });
+                return;
+            }
+
+            if (body.password.length < 6) {
+                Toast.warning('La contraseña debe tener al menos 6 caracteres.', { position: 'top-center' });
+                return;
+            }
+
+            btn.disabled    = true;
+            btn.textContent = 'Creando cuenta…';
+
+            try {
+                const res  = await fetch('/register', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify(body),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    Toast.error(data.error || 'Error al registrarse.', { position: 'top-center' });
+                    return;
+                }
+
+                Toast.success('¡Cuenta creada! Redirigiendo al login…', { position: 'top-center', duration: 2000 });
+                setTimeout(() => { window.location.href = '/login'; }, 1500);
+
+            } catch {
+                Toast.error('No se pudo conectar con el servidor.', { position: 'top-center' });
+            } finally {
+                btn.disabled    = false;
+                btn.textContent = 'Crear cuenta';
+            }
         });
     </script>
 

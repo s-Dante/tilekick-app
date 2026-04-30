@@ -1,3 +1,4 @@
 allowBuilds:
   bcrypt: true
   node-base64: true
+  sharp: true

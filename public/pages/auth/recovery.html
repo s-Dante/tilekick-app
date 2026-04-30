@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TileKick — Recuperar contraseña</title>
+    <meta name="description" content="Recupera el acceso a tu cuenta TileKick en tres pasos.">
+    <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
+    <link rel="stylesheet" href="/styles/auth/auth.css">
+</head>
+
+<body class="auth-page">
+
+    <div class="auth-card" id="recoveryCard">
+
+        <!-- ── Indicador de pasos ── -->
+        <div class="recovery-steps">
+            <div class="recovery-step active" data-step="1">
+                <div class="step-circle">1</div>
+                <span class="step-label">Correo</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="recovery-step" data-step="2">
+                <div class="step-circle">2</div>
+                <span class="step-label">Token</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="recovery-step" data-step="3">
+                <div class="step-circle">3</div>
+                <span class="step-label">Nueva contraseña</span>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════
+             STEP 1 — Ingresar correo
+             ══════════════════════════════════ -->
+        <div id="step1" class="recovery-pane">
+            <div class="auth-card-header">
+                <h1>Recuperar contraseña</h1>
+                <p class="auth-card-subtitle">Ingresa tu correo y te enviaremos un código de 8 dígitos.</p>
+            </div>
+
+            <form id="emailForm" class="auth-form">
+                <div class="auth-field">
+                    <label for="emailInput">Correo electrónico</label>
+                    <input class="input" type="email" id="emailInput" name="email"
+                           placeholder="tu@correo.com" autocomplete="email" required>
+                </div>
+                <button type="submit" id="emailBtn" class="btn btn-primary btn-submit">
+                    Enviar código
+                </button>
+            </form>
+
+            <p class="auth-footer">
+                <a href="/login">← Volver al inicio de sesión</a>
+            </p>
+        </div>
+
+        <!-- ══════════════════════════════════
+             STEP 2 — Token OTP
+             ══════════════════════════════════ -->
+        <div id="step2" class="recovery-pane hidden">
+            <div class="auth-card-header">
+                <h1>Ingresa el código</h1>
+                <p class="auth-card-subtitle" id="tokenSubtitle">
+                    Enviamos un código de 8 caracteres a tu correo.
+                </p>
+            </div>
+
+            <form id="tokenForm" class="auth-form">
+                <div class="otp-grid" id="otpGrid">
+                    <!-- 8 inputs generados por JS -->
+                </div>
+
+                <div class="recovery-timer-row">
+                    <span class="recovery-timer" id="timerDisplay">Expira en 15:00</span>
+                    <button type="button" id="resendBtn" class="btn btn-ghost btn-sm recovery-resend" disabled>
+                        Reenviar código
+                    </button>
+                </div>
+
+                <button type="submit" id="tokenBtn" class="btn btn-primary btn-submit">
+                    Verificar código
+                </button>
+            </form>
+
+            <p class="auth-footer">
+                <a href="#" id="backToEmail">← Cambiar correo</a>
+            </p>
+        </div>
+
+        <!-- ══════════════════════════════════
+             STEP 3 — Nueva contraseña
+             ══════════════════════════════════ -->
+        <div id="step3" class="recovery-pane hidden">
+            <div class="auth-card-header">
+                <h1>Nueva contraseña</h1>
+                <p class="auth-card-subtitle">Elige una contraseña segura para tu cuenta.</p>
+            </div>
+
+            <form id="passwordForm" class="auth-form">
+                <div class="auth-field">
+                    <label for="newPassword">Nueva contraseña</label>
+                    <div class="input-password-wrap">
+                        <input class="input" type="password" id="newPassword" name="newPassword"
+                               placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+                        <button type="button" class="toggle-password" data-target="newPassword" aria-label="Ver contraseña">
+                            <svg viewBox="0 0 20 20" fill="currentColor" class="eye-icon"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Indicador de fortaleza -->
+                    <div class="password-strength" id="strengthBar">
+                        <div class="strength-fill" id="strengthFill"></div>
+                    </div>
+                    <span class="strength-label" id="strengthLabel"></span>
+                </div>
+
+                <div class="auth-field">
+                    <label for="confirmPassword">Confirmar contraseña</label>
+                    <div class="input-password-wrap">
+                        <input class="input" type="password" id="confirmPassword" name="confirmPassword"
+                               placeholder="Repite tu contraseña" autocomplete="new-password">
+                        <button type="button" class="toggle-password" data-target="confirmPassword" aria-label="Ver contraseña">
+                            <svg viewBox="0 0 20 20" fill="currentColor" class="eye-icon"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" id="passwordBtn" class="btn btn-primary btn-submit">
+                    Cambiar contraseña
+                </button>
+            </form>
+        </div>
+
+    </div><!-- /auth-card -->
+
+    <script src="/js/components/toast.js"></script>
+    <script>
+    (() => {
+        /* ── Estado ── */
+        let currentStep  = 1;
+        let userEmail    = '';
+        let sessionKey   = '';
+        let timerInterval = null;
+        let timerSeconds  = 15 * 60; // 15 min
+        let resendCooldown = null;
+
+        /* ── Helpers DOM ── */
+        const steps    = document.querySelectorAll('.recovery-step');
+        const panes    = document.querySelectorAll('.recovery-pane');
+        const connectors = document.querySelectorAll('.step-connector');
+
+        function goToStep(n) {
+            currentStep = n;
+
+            /* Actualizar indicadores */
+            steps.forEach((s) => {
+                const sn = parseInt(s.dataset.step);
+                s.classList.toggle('active',    sn === n);
+                s.classList.toggle('completed', sn < n);
+            });
+            connectors.forEach((c, i) => {
+                c.classList.toggle('done', i < n - 1);
+            });
+
+            /* Mostrar pane correcto */
+            panes.forEach((p, i) => {
+                p.classList.toggle('hidden', i !== n - 1);
+            });
+        }
+
+        /* ── STEP 1 — Email ── */
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('emailInput').value.trim();
+            if (!email) { Toast.warning('Ingresa tu correo.', { position: 'top-center' }); return; }
+
+            const btn = document.getElementById('emailBtn');
+            btn.disabled = true; btn.textContent = 'Enviando…';
+
+            try {
+                const res  = await fetch('/api/recovery/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    Toast.error(data.error || 'No se pudo enviar el código.', { position: 'top-center' });
+                    return;
+                }
+
+                userEmail = email;
+                document.getElementById('tokenSubtitle').textContent =
+                    `Enviamos un código de 8 caracteres a ${email}.`;
+
+                Toast.success('¡Código enviado! Revisa tu correo.', { position: 'top-center' });
+                goToStep(2);
+                buildOtpInputs();
+                startTimer();
+
+            } catch {
+                Toast.error('Error de conexión. Intenta de nuevo.', { position: 'top-center' });
+            } finally {
+                btn.disabled = false; btn.textContent = 'Enviar código';
+            }
+        });
+
+        /* ── OTP Grid ── */
+        function buildOtpInputs() {
+            const grid = document.getElementById('otpGrid');
+            grid.innerHTML = '';
+
+            for (let i = 0; i < 8; i++) {
+                const inp = document.createElement('input');
+                inp.type      = 'text';
+                inp.maxLength = 1;
+                inp.className = 'otp-input';
+                inp.inputMode = 'text';
+                inp.setAttribute('autocomplete', 'one-time-code');
+                inp.dataset.index = i;
+
+                inp.addEventListener('input', (ev) => {
+                    const val = ev.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                    inp.value = val.slice(-1);
+                    if (val && i < 7) {
+                        grid.children[i + 1].focus();
+                    }
+                });
+
+                inp.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Backspace' && !inp.value && i > 0) {
+                        grid.children[i - 1].focus();
+                    }
+                    if (ev.key === 'ArrowLeft'  && i > 0) grid.children[i - 1].focus();
+                    if (ev.key === 'ArrowRight' && i < 7) grid.children[i + 1].focus();
+                });
+
+                inp.addEventListener('paste', (ev) => {
+                    ev.preventDefault();
+                    const pasted = (ev.clipboardData.getData('text') || '')
+                        .replace(/[^a-zA-Z0-9]/g, '')
+                        .toUpperCase()
+                        .slice(0, 8);
+                    [...pasted].forEach((ch, idx) => {
+                        if (grid.children[idx]) grid.children[idx].value = ch;
+                    });
+                    const next = Math.min(pasted.length, 7);
+                    grid.children[next].focus();
+                });
+
+                grid.appendChild(inp);
+            }
+
+            grid.children[0].focus();
+        }
+
+        function getOtpValue() {
+            return [...document.getElementById('otpGrid').children]
+                .map(inp => inp.value)
+                .join('');
+        }
+
+        /* ── Timer countdown ── */
+        function startTimer() {
+            timerSeconds = 15 * 60;
+            updateTimerDisplay();
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                updateTimerDisplay();
+                if (timerSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    Toast.warning('El código ha expirado. Solicita uno nuevo.', { position: 'top-center', duration: 0 });
+                    enableResend();
+                }
+            }, 1000);
+
+            /* Habilitar reenvío tras 60 s */
+            const resendBtn = document.getElementById('resendBtn');
+            resendBtn.disabled = true;
+            clearTimeout(resendCooldown);
+            resendCooldown = setTimeout(() => { resendBtn.disabled = false; }, 60_000);
+        }
+
+        function updateTimerDisplay() {
+            const m = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+            const s = String(timerSeconds % 60).padStart(2, '0');
+            document.getElementById('timerDisplay').textContent =
+                timerSeconds > 0 ? `Expira en ${m}:${s}` : 'Código expirado';
+        }
+
+        function enableResend() {
+            document.getElementById('resendBtn').disabled = false;
+        }
+
+        /* ── Reenviar ── */
+        document.getElementById('resendBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('resendBtn');
+            btn.disabled = true; btn.textContent = 'Enviando…';
+
+            try {
+                const res = await fetch('/api/recovery/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail }),
+                });
+                const data = await res.json();
+                if (!res.ok) { Toast.error(data.error || 'No se pudo reenviar.', { position: 'top-center' }); return; }
+                Toast.success('Código reenviado. Revisa tu correo.', { position: 'top-center' });
+
+                /* Limpiar inputs */
+                [...document.getElementById('otpGrid').children].forEach(i => i.value = '');
+                document.getElementById('otpGrid').children[0].focus();
+                startTimer();
+            } catch {
+                Toast.error('Error de conexión.', { position: 'top-center' });
+            } finally {
+                btn.textContent = 'Reenviar código';
+            }
+        });
+
+        /* ── Volver a email ── */
+        document.getElementById('backToEmail').addEventListener('click', (e) => {
+            e.preventDefault();
+            clearInterval(timerInterval);
+            goToStep(1);
+        });
+
+        /* ── STEP 2 — Verificar token ── */
+        document.getElementById('tokenForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = getOtpValue();
+
+            if (token.length < 8) {
+                Toast.warning('Ingresa el código completo (8 caracteres).', { position: 'top-center' });
+                return;
+            }
+
+            const btn = document.getElementById('tokenBtn');
+            btn.disabled = true; btn.textContent = 'Verificando…';
+
+            try {
+                const res  = await fetch('/api/recovery/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail, token }),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    Toast.error(data.error || 'Código incorrecto o expirado.', { position: 'top-center' });
+                    /* Sacudir inputs */
+                    document.getElementById('otpGrid').classList.add('otp-shake');
+                    setTimeout(() => document.getElementById('otpGrid').classList.remove('otp-shake'), 500);
+                    return;
+                }
+
+                sessionKey = data.sessionKey;
+                clearInterval(timerInterval);
+                Toast.success('Código válido. Ahora elige tu nueva contraseña.', { position: 'top-center' });
+                goToStep(3);
+                document.getElementById('newPassword').focus();
+
+            } catch {
+                Toast.error('Error de conexión. Intenta de nuevo.', { position: 'top-center' });
+            } finally {
+                btn.disabled = false; btn.textContent = 'Verificar código';
+            }
+        });
+
+        /* ── STEP 3 — Cambiar contraseña ── */
+
+        /* Mostrar/ocultar contraseña */
+        document.querySelectorAll('.toggle-password').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const inp = document.getElementById(btn.dataset.target);
+                inp.type = inp.type === 'password' ? 'text' : 'password';
+            });
+        });
+
+        /* Indicador de fortaleza */
+        document.getElementById('newPassword').addEventListener('input', () => {
+            const val = document.getElementById('newPassword').value;
+            const { score, label } = passwordStrength(val);
+            const fill  = document.getElementById('strengthFill');
+            const lbl   = document.getElementById('strengthLabel');
+            const colors = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#22c55e'];
+            fill.style.width = `${(score / 4) * 100}%`;
+            fill.style.background = colors[score] ?? colors[0];
+            lbl.textContent = val ? label : '';
+        });
+
+        function passwordStrength(pwd) {
+            let score = 0;
+            if (pwd.length >= 6)  score++;
+            if (pwd.length >= 10) score++;
+            if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+            if (/[0-9]/.test(pwd)) score++;
+            if (/[^a-zA-Z0-9]/.test(pwd)) score++;
+            score = Math.min(score, 4);
+            const labels = ['Muy débil', 'Débil', 'Regular', 'Buena', 'Fuerte'];
+            return { score, label: labels[score] };
+        }
+
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPassword     = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (newPassword.length < 6) {
+                Toast.warning('La contraseña debe tener al menos 6 caracteres.', { position: 'top-center' });
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                Toast.error('Las contraseñas no coinciden.', { position: 'top-center' });
+                return;
+            }
+
+            const btn = document.getElementById('passwordBtn');
+            btn.disabled = true; btn.textContent = 'Guardando…';
+
+            try {
+                const res  = await fetch('/api/recovery/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionKey, newPassword, confirmPassword }),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    Toast.error(data.error || 'No se pudo cambiar la contraseña.', { position: 'top-center' });
+                    return;
+                }
+
+                Toast.success('¡Contraseña cambiada! Redirigiendo al login…', {
+                    position: 'top-center',
+                    duration: 2500,
+                });
+                setTimeout(() => { window.location.href = '/login'; }, 2000);
+
+            } catch {
+                Toast.error('Error de conexión. Intenta de nuevo.', { position: 'top-center' });
+            } finally {
+                btn.disabled = false; btn.textContent = 'Cambiar contraseña';
+            }
+        });
+
+    })();
+    </script>
+
+</body>
+</html>

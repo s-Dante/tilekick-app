@@ -1,69 +1,344 @@
 /* ============================================================
-   LEADERBOARD PAGE
+   LEADERBOARD PAGE — Podium & Table
    ============================================================ */
+
+/* ── Podium Section ────────────────────────────────────────── */
+.podium-section {
+  margin-bottom: var(--sp-14);
+  padding-top: var(--sp-6);
+}
+
+.podium-wrap {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--sp-8);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.podium-loading {
+  width: 100%;
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--sp-12);
+}
+
+/* Individual Podium Card (Elegant Upgrade) */
+.podium-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-3xl);
+  /* Extra rounded as requested */
+  padding: var(--sp-8) var(--sp-4) var(--sp-6);
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.podium-player:hover {
+  transform: scale(1.05);
+  border-color: var(--primary-lt);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Rank Medals / Badges */
+.podium-place-badge {
+  position: absolute;
+  top: -24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50% 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  z-index: 10;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  border: 3px solid var(--surface);
+}
+
+/* Posicionamiento y escalas */
+.podium-h-1 {
+  order: 2;
+  z-index: 3;
+  margin-bottom: 0;
+  min-height: 300px;
+  padding-top: var(--sp-10);
+  border-color: var(--primary-lt);
+  box-shadow: 0 10px 30px rgba(53, 64, 36, 0.1);
+}
+
+.podium-h-2 {
+  order: 1;
+  z-index: 2;
+  min-height: 230px;
+}
+
+.podium-h-3 {
+  order: 3;
+  z-index: 1;
+  min-height: 190px;
+}
+
+.podium-h-1 .podium-place-badge {
+  background: #d4af37;
+  color: var(-text);
+}
+
+.podium-h-2 .podium-place-badge {
+  background: #94a3b8;
+  color: var(--text);
+}
+
+.podium-h-3 .podium-place-badge {
+  background: #ce8946;
+  color: var(--text);
+}
+
+/* Avatar con anillo de color */
+.podium-avatar-wrap {
+  margin-bottom: var(--sp-4);
+  position: relative;
+}
+
+.podium-avatar-wrap img,
+.avatar-fallback {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--surface-3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.podium-player:hover .podium-avatar-wrap img {
+  transform: scale(1.05);
+}
+
+.podium-h-1 img {
+  border-color: #d4af37;
+}
+
+.podium-h-2 img {
+  border-color: #94a3b8;
+}
+
+.podium-h-3 img {
+  border-color: #ce8946;
+}
+
+.podium-username {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.podium-elo {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--primary);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.podium-wins {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Table Section ─────────────────────────────────────────── */
+.ranking-section {
+  margin-top: var(--sp-12);
+}
+
+.ranking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-6);
+}
+
+.ranking-header-text {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.ranking-header h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ranking-count {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
 
 .leaderboard-table-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-3xl);
+  /* Match roundness */
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 #leaderboard-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--text-sm);
-}
-
-#leaderboard-table thead tr {
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border);
 }
 
 #leaderboard-table thead th {
-  padding: var(--sp-4) var(--sp-5);
-  text-align: left;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--surface-2);
   color: var(--text-muted);
-}
-
-#leaderboard-table tbody tr {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: left;
   border-bottom: 1px solid var(--border);
-  transition: background var(--transition);
 }
-#leaderboard-table tbody tr:last-child { border-bottom: none; }
-#leaderboard-table tbody tr:hover      { background: var(--surface-2); }
 
 #leaderboard-table tbody td {
-  padding: var(--sp-4) var(--sp-5);
-  color: var(--text);
+  padding: var(--sp-5) var(--sp-6);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+  transition: background 0.2s ease;
 }
 
-/* Columna de posición */
-.rank-cell {
+#leaderboard-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+#leaderboard-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.row-me {
+  background: rgba(53, 64, 36, 0.05) !important;
+}
+
+.badge-you {
+  font-size: 0.65rem;
+  background: var(--primary);
+  color: white;
+  padding: 2px 10px;
+  border-radius: 6px;
+  margin-left: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Table Avatars */
+.table-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+}
+
+.player-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   font-weight: 700;
-  width: 60px;
-}
-.rank-1 { color: #fbbf24; } /* oro  */
-.rank-2 { color: #94a3b8; } /* plata */
-.rank-3 { color: var(--olive-lt); } /* bronce */
-
-/* Nombre del jugador */
-.player-cell {
-  font-weight: 500;
   color: var(--text);
 }
 
-/* Puntos destacados */
-.points-cell {
-  font-weight: 600;
-  color: var(--primary);
+.num-cell {
+  text-align: right;
+  color: var(--text-muted);
+  font-family: monospace;
+  font-size: 0.95rem;
 }
 
-/* Ratio victorias/derrotas */
-.ratio-cell {
+.points-cell {
+  text-align: right;
+  font-weight: 800;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+.win-cell {
+  color: var(--teal) !important;
+}
+
+.loss-cell {
+  color: #f87171 !important;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--sp-10);
+}
+
+.pag-btn {
+  min-width: 42px;
+  height: 42px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 700;
   color: var(--text-muted);
+  transition: all var(--transition);
+}
+
+.pag-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--primary);
+  color: var(--text);
+  transform: translateY(-2px);
+}
+
+.pag-active {
+  background: var(--primary);
+  color: white !important;
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(53, 64, 36, 0.2);
+}
+
+.pag-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pag-ellipsis {
+  padding: 0 8px;
+  color: var(--text-hint);
+  font-weight: 700;
 }

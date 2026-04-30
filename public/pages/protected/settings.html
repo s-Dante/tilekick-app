@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TileKick — Configuración</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <link rel="stylesheet" href="/styles/protected/layout.css">
     <link rel="stylesheet" href="/styles/protected/settings.css">
 </head>
@@ -13,19 +14,36 @@
 <body>
 <div id="layout">
 
+    <!-- Sidebar -->
     <nav id="sidebar">
         <div id="sidebar-header">
-            <h2>TileKick</h2>
+            <h2>TILEKICK</h2>
         </div>
+        
         <ul id="sidebar-nav">
-            <li><a href="/dashboard">Inicio</a></li>
-            <li><a href="/game/menu">Jugar</a></li>
-            <li><a href="/leaderboard">Clasificación</a></li>
-            <li><a href="/profile">Perfil</a></li>
-            <li><a href="/settings">Configuración</a></li>
+            <li><a href="/dashboard"><span>Inicio</span></a></li>
+            <li><a href="/game/menu"><span>Jugar</span></a></li>
+            <li><a href="/leaderboard"><span>Clasificación</span></a></li>
+            <li><a href="/rules"><span>Reglas</span></a></li>
         </ul>
-        <div id="sidebar-footer">
-            <a href="/logout" id="logout-btn">Cerrar sesión</a>
+
+        <div id="sidebar-bottom">
+            <a href="/settings" class="nav-link-bottom"><span>Configuración</span></a>
+            
+            <div class="nav-profile-card" id="nav-profile-card">
+                <div class="profile-dropdown" id="profile-dropdown">
+                    <a href="/profile" class="dropdown-item">👤 Ver perfil</a>
+                    <a href="/logout" class="dropdown-item logout">🚪 Cerrar sesión</a>
+                </div>
+                <div class="nav-avatar">
+                    <img id="nav-avatar-img" src="" alt="" style="display:none;">
+                    <span id="nav-avatar-fallback">👤</span>
+                </div>
+                <div class="nav-user-info">
+                    <div class="nav-username" id="nav-username">Cargando...</div>
+                </div>
+                <div class="nav-dots">⋮</div>
+            </div>
         </div>
     </nav>
 
@@ -33,85 +51,190 @@
 
         <div class="page-header">
             <h1>Configuración</h1>
-            <p>Administra tu cuenta y preferencias.</p>
+            <p>Personaliza tu experiencia de juego.</p>
         </div>
 
-        <!-- Sección: Información personal -->
+        <!-- Sección: Sonido -->
         <div class="settings-section">
             <div class="settings-section-header">
-                <h2>Información personal</h2>
-                <p>Actualiza tu nombre y correo electrónico.</p>
+                <h2>🔊 Sonido</h2>
+                <p>Controla el volumen de la música y los efectos de sonido.</p>
             </div>
             <div class="settings-body">
-                <form class="settings-form" id="accountForm">
-                    <div class="form-group">
-                        <label for="name">Nombre</label>
-                        <input class="input" type="text" id="name" name="name" placeholder="Tu nombre">
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h3>Música del juego</h3>
+                        <p>Música de fondo durante las partidas.</p>
                     </div>
-                    <div class="form-group">
-                        <label for="email">Correo electrónico</label>
-                        <input class="input" type="email" id="email" name="email" placeholder="tu@correo.com">
+                    <div class="settings-row-control">
+                        <input class="range-input" type="range" id="music-volume" name="music_volume" min="0" max="100" value="80">
+                        <span class="range-value" id="music-volume-val">80</span>
                     </div>
-                    <p id="accountError" class="error-msg"></p>
-                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Sección: Contraseña -->
-        <div class="settings-section">
-            <div class="settings-section-header">
-                <h2>Contraseña</h2>
-                <p>Cambia tu contraseña de acceso.</p>
-            </div>
-            <div class="settings-body">
-                <form class="settings-form" id="passwordForm">
-                    <div class="form-group">
-                        <label for="currentPassword">Contraseña actual</label>
-                        <input class="input" type="password" id="currentPassword" placeholder="Contraseña actual">
+                </div>
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h3>Efectos de sonido</h3>
+                        <p>Sonidos de acciones dentro del juego.</p>
                     </div>
-                    <div class="form-group">
-                        <label for="newPassword">Nueva contraseña</label>
-                        <input class="input" type="password" id="newPassword" placeholder="Nueva contraseña">
+                    <div class="settings-row-control">
+                        <input class="range-input" type="range" id="sfx-volume" name="sfx_volume" min="0" max="100" value="80">
+                        <span class="range-value" id="sfx-volume-val">80</span>
                     </div>
-                    <div class="form-group">
-                        <label for="confirmNewPassword">Confirmar contraseña</label>
-                        <input class="input" type="password" id="confirmNewPassword" placeholder="Repite la nueva contraseña">
-                    </div>
-                    <p id="passwordError" class="error-msg"></p>
-                    <button type="submit" class="btn btn-primary">Cambiar contraseña</button>
-                </form>
+                </div>
             </div>
         </div>
 
-        <!-- Sección: Preferencias -->
+        <!-- Sección: Gráficos -->
         <div class="settings-section">
             <div class="settings-section-header">
-                <h2>Preferencias</h2>
-                <p>Ajusta el idioma y otras opciones.</p>
+                <h2>🖥️ Gráficos</h2>
+                <p>Ajusta la calidad visual según tu dispositivo.</p>
             </div>
             <div class="settings-body">
-                <form class="settings-form">
-                    <div class="form-group">
-                        <label for="language">Idioma</label>
-                        <select class="input" id="language" name="language">
-                            <option value="es">Español</option>
-                            <option value="en">English</option>
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h3>Calidad gráfica</h3>
+                        <p>Afecta al rendimiento y la calidad visual del juego.</p>
+                    </div>
+                    <div class="settings-row-control">
+                        <select class="input input-sm" id="graphics-quality" name="graphics_quality">
+                            <option value="1">Baja</option>
+                            <option value="2" selected>Media</option>
+                            <option value="3">Alta</option>
+                            <option value="4">Ultra</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Guardar preferencias</button>
-                </form>
+                </div>
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h3>Mostrar FPS</h3>
+                        <p>Muestra el contador de fotogramas por segundo en pantalla.</p>
+                    </div>
+                    <div class="settings-row-control">
+                        <label class="toggle" for="show-fps">
+                            <input type="checkbox" id="show-fps" name="show_fps">
+                            <span class="toggle-track"></span>
+                        </label>
+                    </div>
+                </div>
             </div>
+        </div>
+
+        <!-- Sección: Idioma -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <h2>🌐 Idioma</h2>
+                <p>Selecciona el idioma de la interfaz.</p>
+            </div>
+            <div class="settings-body">
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h3>Idioma de la app</h3>
+                        <p>Cambia el idioma de menús y textos.</p>
+                    </div>
+                    <div class="settings-row-control">
+                        <select class="input input-sm" id="language" name="language">
+                            <option value="es">🇲🇽 Español</option>
+                            <option value="en">🇺🇸 English</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección: Tablero (próximamente) -->
+        <div class="settings-section settings-section-disabled">
+            <div class="settings-section-header">
+                <h2>🎨 Color de Tablero <span class="badge-soon">Próximamente</span></h2>
+                <p>Personaliza los colores del tablero de juego.</p>
+            </div>
+            <div class="settings-body">
+                <div class="settings-row">
+                    <div class="settings-row-info">
+                        <h3>Tema del tablero</h3>
+                        <p>Elige entre diferentes esquemas de color para el tablero.</p>
+                    </div>
+                    <div class="settings-row-control">
+                        <select class="input input-sm" disabled>
+                            <option>Clásico (predeterminado)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guardar -->
+        <div class="settings-save-bar">
+            <button class="btn btn-primary" id="btn-save-settings">Guardar cambios</button>
         </div>
 
     </main>
 
 </div>
+
+<script src="/js/components/toast.js"></script>
+<script src="/scripts/sidebar.js"></script>
 <script>
-    document.querySelectorAll('#sidebar-nav a').forEach(link => {
-        if (new URL(link.href).pathname === window.location.pathname)
-            link.classList.add('active');
+    ['music-volume', 'sfx-volume'].forEach(id => {
+        const input = document.getElementById(id);
+        const val   = document.getElementById(id + '-val');
+        input.addEventListener('input', () => { val.textContent = input.value; });
     });
+
+    async function loadPreferences() {
+        try {
+            const res = await fetch('/api/me/preferences');
+            if (!res.ok) return;
+            const prefs = await res.json();
+
+            document.getElementById('music-volume').value      = prefs.music_volume ?? 80;
+            document.getElementById('music-volume-val').textContent = prefs.music_volume ?? 80;
+
+            document.getElementById('sfx-volume').value        = prefs.sfx_volume ?? 80;
+            document.getElementById('sfx-volume-val').textContent = prefs.sfx_volume ?? 80;
+
+            document.getElementById('graphics-quality').value  = prefs.graphics_quality ?? 2;
+            document.getElementById('show-fps').checked        = !!prefs.show_fps;
+            document.getElementById('language').value          = prefs.language ?? 'es';
+        } catch (err) {
+            console.error('[Settings] Error al cargar preferencias:', err);
+        }
+    }
+
+    document.getElementById('btn-save-settings').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-save-settings');
+        btn.disabled    = true;
+        btn.textContent = 'Guardando…';
+
+        const payload = {
+            music_volume:     parseInt(document.getElementById('music-volume').value),
+            sfx_volume:       parseInt(document.getElementById('sfx-volume').value),
+            graphics_quality: parseInt(document.getElementById('graphics-quality').value),
+            show_fps:         document.getElementById('show-fps').checked ? 1 : 0,
+            language:         document.getElementById('language').value,
+        };
+
+        try {
+            const res = await fetch('/api/me/preferences', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                Toast.error('Error al guardar las preferencias.');
+            } else {
+                Toast.success('Preferencias guardadas correctamente.');
+            }
+        } catch (err) {
+            Toast.error('Error de conexión.');
+        } finally {
+            btn.disabled    = false;
+            btn.textContent = 'Guardar cambios';
+        }
+    });
+
+    loadPreferences();
 </script>
 </body>
 </html>

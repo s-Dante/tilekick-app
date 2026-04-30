@@ -159,3 +159,241 @@
   height: 1px;
   background: var(--border-2);
 }
+
+/* ============================================================
+   RECOVERY PAGE
+   ============================================================ */
+
+/* --- Panes (steps) --- */
+.recovery-pane {
+  animation: pane-in 0.3s ease forwards;
+}
+
+.recovery-pane.hidden {
+  display: none;
+}
+
+@keyframes pane-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Indicador de 3 pasos --- */
+.recovery-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: var(--sp-8);
+}
+
+.recovery-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  position: relative;
+}
+
+.step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border-2);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  position: relative;
+  z-index: 1;
+}
+
+.step-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-hint);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color var(--transition);
+}
+
+/* Activo */
+.recovery-step.active .step-circle {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--off-white);
+  box-shadow: 0 0 0 4px rgba(53, 64, 36, 0.2);
+}
+
+.recovery-step.active .step-label {
+  color: var(--primary);
+}
+
+/* Completado */
+.recovery-step.completed .step-circle {
+  background: var(--olive-dk);
+  border-color: var(--olive-dk);
+  color: var(--off-white);
+}
+
+.recovery-step.completed .step-circle::after {
+  content: '✓';
+  position: absolute;
+  font-size: 13px;
+}
+
+.recovery-step.completed .step-circle span { display: none; }
+
+/* Línea conectora */
+.step-connector {
+  flex: 1;
+  height: 2px;
+  background: var(--border-2);
+  min-width: 32px;
+  margin-bottom: 16px;
+  transition: background 0.3s ease;
+}
+
+.step-connector.done {
+  background: var(--olive-dk);
+}
+
+/* --- OTP inputs --- */
+.otp-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: var(--sp-2);
+  transition: transform 0.15s ease;
+}
+
+.otp-grid.otp-shake {
+  animation: otp-shake 0.4s ease;
+}
+
+@keyframes otp-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+
+.otp-input {
+  width: 100%;
+  aspect-ratio: 1;
+  text-align: center;
+  font-size: var(--text-base);
+  font-weight: 700;
+  font-family: var(--font);
+  letter-spacing: 0;
+  background: var(--surface-2);
+  border: 2px solid var(--border-2);
+  border-radius: var(--radius);
+  color: var(--text);
+  caret-color: var(--primary);
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  text-transform: uppercase;
+}
+
+.otp-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(53, 64, 36, 0.18);
+}
+
+.otp-input:not(:placeholder-shown) {
+  background: var(--surface-3);
+}
+
+/* --- Timer row --- */
+.recovery-timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.recovery-timer {
+  font-size: var(--text-xs);
+  color: var(--text-hint);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.recovery-resend {
+  font-size: var(--text-xs);
+  padding: var(--sp-1) var(--sp-3);
+}
+
+.recovery-resend:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Input con toggle de contraseña --- */
+.input-password-wrap {
+  position: relative;
+}
+
+.input-password-wrap .input {
+  padding-right: 2.75rem;
+}
+
+.toggle-password {
+  position: absolute;
+  right: var(--sp-3);
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-hint);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition);
+}
+
+.toggle-password:hover {
+  color: var(--text-muted);
+}
+
+.eye-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Barra de fortaleza --- */
+.password-strength {
+  height: 4px;
+  background: var(--border-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: var(--sp-2);
+}
+
+.strength-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  transition: width 0.35s ease, background 0.35s ease;
+}
+
+.strength-label {
+  font-size: var(--text-xs);
+  color: var(--text-hint);
+  font-weight: 600;
+  margin-top: var(--sp-1);
+  display: block;
+}
+
+/* --- Botón tamaño sm (para reenvío) --- */
+.btn-sm {
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--text-xs);
+}

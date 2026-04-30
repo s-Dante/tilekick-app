@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TileKick — Buscar partida</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <link rel="stylesheet" href="/styles/protected/layout.css">
     <link rel="stylesheet" href="/styles/protected/game/menu.css">
 </head>
@@ -13,19 +14,36 @@
 <body>
     <div id="layout">
 
+        <!-- Sidebar -->
         <nav id="sidebar">
             <div id="sidebar-header">
-                <h2>TileKick</h2>
+                <h2>TILEKICK</h2>
             </div>
+
             <ul id="sidebar-nav">
-                <li><a href="/dashboard">Inicio</a></li>
-                <li><a href="/game/menu">Jugar</a></li>
-                <li><a href="/leaderboard">Clasificación</a></li>
-                <li><a href="/profile">Perfil</a></li>
-                <li><a href="/settings">Configuración</a></li>
+                <li><a href="/dashboard"><span>Inicio</span></a></li>
+                <li><a href="/game/menu"><span>Jugar</span></a></li>
+                <li><a href="/leaderboard"><span>Clasificación</span></a></li>
+                <li><a href="/rules"><span>Reglas</span></a></li>
             </ul>
-            <div id="sidebar-footer">
-                <a href="/logout" id="logout-btn">Cerrar sesión</a>
+
+            <div id="sidebar-bottom">
+                <a href="/settings" class="nav-link-bottom"><span>Configuración</span></a>
+
+                <div class="nav-profile-card" id="nav-profile-card">
+                    <div class="profile-dropdown" id="profile-dropdown">
+                        <a href="/profile" class="dropdown-item">👤 Ver perfil</a>
+                        <a href="/logout" class="dropdown-item logout">🚪 Cerrar sesión</a>
+                    </div>
+                    <div class="nav-avatar">
+                        <img id="nav-avatar-img" src="" alt="" style="display:none;">
+                        <span id="nav-avatar-fallback">👤</span>
+                    </div>
+                    <div class="nav-user-info">
+                        <div class="nav-username" id="nav-username">Cargando...</div>
+                    </div>
+                    <div class="nav-dots">⋮</div>
+                </div>
             </div>
         </nav>
 
@@ -33,101 +51,114 @@
 
             <div class="page-header">
                 <h1>Nueva partida</h1>
-                <p>Elige el modo, mapa y tipo de juego para comenzar.</p>
+                <p>Configura tu partida y comienza a jugar.</p>
             </div>
 
-            <form id="gameMenuForm">
-                <div class="form-columns">
-                <!-- Modo de juego -->
-                <fieldset>
-                    <legend>Modo de juego</legend>
-                    <div class="radio-group">
-                        <div class="radio-option">
-                            <input type="radio" name="mode" id="mode-online" value="online" required>
-                            <label for="mode-online" class="radio-label">
-                                <span class="radio-icon">🌐</span>
-                                Multijugador online
-                            </label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" name="mode" id="mode-local" value="local">
-                            <label for="mode-local" class="radio-label">
-                                <span class="radio-icon">🎮</span>
-                                Multijugador local
-                            </label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" name="mode" id="mode-ai" value="ai">
-                            <label for="mode-ai" class="radio-label">
-                                <span class="radio-icon">🤖</span>
-                                Contra la IA
-                            </label>
-                        </div>
-                    </div>
-                </fieldset>
+            <form id="gameMenuForm" class="game-menu-grid">
 
-                <!-- Mapa -->
-                <fieldset>
-                    <legend>Mapa</legend>
-                    <div class="radio-group">
-                        <div class="radio-option">
-                            <input type="radio" name="map" id="map-clasico" value="estadio_clasico" required>
-                            <label for="map-clasico" class="radio-label">
-                                <span class="radio-icon">🌱</span>
-                                Cancha tradicional
-                            </label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" name="map" id="map-noche" value="arena_nocturna">
-                            <label for="map-noche" class="radio-label">
-                                <span class="radio-icon">🏝️</span>
-                                Cancha en la playa
-                            </label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" name="map" id="map-playa" value="campo_playa">
-                            <label for="map-playa" class="radio-label">
-                                <span class="radio-icon">🪨</span>
-                                Cancha en la calle
-                            </label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" name="map" id="map-random" value="aleatorio">
-                            <label for="map-random" class="radio-label">
-                                <span class="radio-icon">🔀</span>
-                                Cancha aleatoria
-                            </label>
-                        </div>
+                <!-- Sección 1: Modo de Juego -->
+                <div class="menu-section">
+                    <h2 class="section-title">1. Modo de Juego</h2>
+                    <div class="selection-grid">
+                        <label class="selection-card">
+                            <input type="radio" name="mode" value="online" required checked>
+                            <div class="card-content">
+                                <span class="card-icon">🌐</span>
+                                <div class="card-text">
+                                    <span class="card-title">Online</span>
+                                    <span class="card-desc">Compite contra el mundo</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="mode" value="local">
+                            <div class="card-content">
+                                <span class="card-icon">👥</span>
+                                <div class="card-text">
+                                    <span class="card-title">Local</span>
+                                    <span class="card-desc">Juega con amigos cerca</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="mode" value="ai">
+                            <div class="card-content">
+                                <span class="card-icon">🤖</span>
+                                <div class="card-text">
+                                    <span class="card-title">Contra IA</span>
+                                    <span class="card-desc">Practica tus tácticas</span>
+                                </div>
+                            </div>
+                        </label>
                     </div>
-                </fieldset>
-
-                <!-- Tipo de juego -->
-                <fieldset>
-                    <legend>Tipo de juego</legend>
-                    <div class="radio-group">
-                        <div class="radio-option">
-                            <input type="radio" name="gameType" id="type-2d" value="2d" required>
-                            <label for="type-2d" class="radio-label">
-                                <span class="radio-icon">▦</span>
-                                2D
-                            </label>
-                        </div>
-                        <div class="radio-option">
-                            <input type="radio" name="gameType" id="type-3d" value="3d">
-                            <label for="type-3d" class="radio-label">
-                                <span class="radio-icon">◈</span>
-                                3D
-                            </label>
-                        </div>
-                    </div>
-                </fieldset>
                 </div>
 
-                <p id="errorMsg" class="error-msg"></p>
+                <!-- Sección 2: Mapa -->
+                <div class="menu-section">
+                    <h2 class="section-title">2. Selecciona el Mapa</h2>
+                    <div class="selection-grid">
+                        <label class="selection-card">
+                            <input type="radio" name="map" value="estadio_clasico" required checked>
+                            <div class="card-content">
+                                <span class="card-icon">🏟️</span>
+                                <div class="card-text">
+                                    <span class="card-title">Estadio Clásico</span>
+                                    <span class="card-desc">Césped tradicional</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="map" value="arena_nocturna">
+                            <div class="card-content">
+                                <span class="card-icon">🏖️</span>
+                                <div class="card-text">
+                                    <span class="card-title">Playero</span>
+                                    <span class="card-desc">A la orilla del mar</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="map" value="campo_playa">
+                            <div class="card-content">
+                                <span class="card-icon">🏙️</span>
+                                <div class="card-text">
+                                    <span class="card-title">Urbano</span>
+                                    <span class="card-desc">Calles de la ciudad</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
 
-                <div class="form-submit-area">
-                    <button type="submit" class="btn btn-primary" id="submitBtn">Jugar ahora</button>
-                    <a href="/dashboard" class="btn btn-ghost">Cancelar</a>
+                <!-- Sección 3: Vista -->
+                <div class="menu-section">
+                    <h2 class="section-title">3. Estilo Visual</h2>
+                    <div class="selection-grid-small">
+                        <label class="selection-card">
+                            <input type="radio" name="gameType" value="2d" required checked>
+                            <div class="card-content">
+                                <span class="card-icon">📝</span>
+                                <div class="card-text">
+                                    <span class="card-title">Vista 2D</span>
+                                    <span class="card-desc">Mecánicas clásicas</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="selection-card">
+                            <input type="radio" name="gameType" value="3d">
+                            <div class="card-content">
+                                <span class="card-icon">🧊</span>
+                                <div class="card-text">
+                                    <span class="card-title">Inmersión 3D</span>
+                                    <span class="card-desc">Experiencia moderna</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="submit-bar">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">Buscar partida</button>
                 </div>
 
             </form>
@@ -136,41 +167,31 @@
 
     </div>
 
+    <script src="/js/components/toast.js"></script>
+    <script src="/scripts/sidebar.js"></script>
     <script>
-        document.querySelectorAll('#sidebar-nav a').forEach(link => {
-            if (new URL(link.href).pathname === window.location.pathname)
-                link.classList.add('active');
-        });
-
         document.getElementById('gameMenuForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            const errorMsg = document.getElementById('errorMsg');
-            errorMsg.style.display = 'none';
-
             const form = e.target;
             const mode = form.querySelector('input[name="mode"]:checked')?.value;
             const map = form.querySelector('input[name="map"]:checked')?.value;
             const gameType = form.querySelector('input[name="gameType"]:checked')?.value;
 
             if (!mode || !map || !gameType) {
-                errorMsg.textContent = 'Por favor selecciona todas las opciones antes de continuar.';
-                errorMsg.style.display = 'block';
+                Toast.error('Por favor selecciona todas las opciones.');
                 return;
             }
 
             const params = new URLSearchParams({ mode, map, gameType });
 
             if (mode === 'online') {
-                // Modo online → sala de espera con matchmaking por socket
                 window.location.href = `/game/waiting?${params.toString()}`;
             } else {
-                // Multijugador local o contra IA → ir directo al juego sin espera
                 const dest = gameType === '3d' ? '/game/3d' : '/game/2d';
                 window.location.href = `${dest}?${params.toString()}`;
             }
         });
 
-        // Cambiar el texto del botón según el modo seleccionado
         document.querySelectorAll('input[name="mode"]').forEach(radio => {
             radio.addEventListener('change', () => {
                 const btn = document.getElementById('submitBtn');

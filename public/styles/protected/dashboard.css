@@ -1,44 +1,160 @@
 /* ============================================================
-   DASHBOARD PAGE
+   DASHBOARD PAGE — Hero, Modes, CTAs
    ============================================================ */
 
-/* Links de acceso rápido */
-.quick-links {
-  display: flex;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
+/* --- Hero --- */
+.dash-hero {
+  padding: var(--sp-10) 0 var(--sp-8);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-8);
 }
 
-.quick-links .btn {
-  padding: var(--sp-4) var(--sp-6);
+.dash-hero h1 {
+  font-size: var(--text-4xl);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.18;
+  margin-bottom: var(--sp-3);
 }
 
-/* Mini tabla de actividad reciente */
-.activity-list {
+.dash-hero p {
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+  max-width: 520px;
+}
+
+/* --- Modo cards --- */
+.dash-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-8);
+}
+
+.mode-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--sp-6);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-4);
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
-.activity-item {
+.mode-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.mode-icon {
+  font-size: 2rem;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.mode-body h3 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--sp-1);
+}
+
+.mode-tag {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--sp-2);
+}
+
+.mode-desc {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* --- CTA sections --- */
+.dash-ctas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+}
+
+.cta-card {
+  border-radius: var(--radius-xl);
+  padding: var(--sp-8);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--surface);
+  gap: var(--sp-6);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+}
+
+.cta-primary {
+  background: var(--primary);
+  border-color: var(--primary-dk);
+}
+
+.cta-primary .cta-text h2,
+.cta-primary .cta-text p {
+  color: var(--off-white);
+}
+
+.cta-secondary {
+  background: var(--surface);
+}
+
+.cta-secondary .cta-text h2 {
+  color: var(--text);
+}
+
+.cta-secondary .cta-text p {
+  color: var(--text-muted);
+}
+
+.cta-text h2 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: var(--sp-1);
+}
+
+.cta-text p {
   font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
-.activity-item .activity-result {
-  font-weight: 600;
+.cta-card .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.activity-item .result-win   { color: var(--teal-lt); }
-.activity-item .result-loss  { color: #f87171; }
-.activity-item .result-draw  { color: var(--text-muted); }
 
-.activity-item .activity-meta {
-  color: var(--text-hint);
-  font-size: var(--text-xs);
+/* Ajuste del btn-outline en fondo claro */
+.cta-secondary .btn-outline {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.cta-secondary .btn-outline:hover {
+  background: var(--primary);
+  color: var(--off-white);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .dash-modes {
+    grid-template-columns: 1fr;
+  }
+  .dash-ctas {
+    grid-template-columns: 1fr;
+  }
 }

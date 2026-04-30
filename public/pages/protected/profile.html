@@ -4,8 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick — Perfil</title>
+    <title>TileKick — Mi Perfil</title>
+    <meta name="description" content="Tu información personal y estadísticas de juego en TileKick.">
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <link rel="stylesheet" href="/styles/protected/layout.css">
     <link rel="stylesheet" href="/styles/protected/profile.css">
 </head>
@@ -13,43 +15,69 @@
 <body>
 <div id="layout">
 
+    <!-- Sidebar -->
     <nav id="sidebar">
         <div id="sidebar-header">
-            <h2>TileKick</h2>
+            <h2>TILEKICK</h2>
         </div>
+        
         <ul id="sidebar-nav">
-            <li><a href="/dashboard">Inicio</a></li>
-            <li><a href="/game/menu">Jugar</a></li>
-            <li><a href="/leaderboard">Clasificación</a></li>
-            <li><a href="/profile">Perfil</a></li>
-            <li><a href="/settings">Configuración</a></li>
+            <li><a href="/dashboard"><span>Inicio</span></a></li>
+            <li><a href="/game/menu"><span>Jugar</span></a></li>
+            <li><a href="/leaderboard"><span>Clasificación</span></a></li>
+            <li><a href="/rules"><span>Reglas</span></a></li>
         </ul>
-        <div id="sidebar-footer">
-            <a href="/logout" id="logout-btn">Cerrar sesión</a>
+
+        <div id="sidebar-bottom">
+            <a href="/settings" class="nav-link-bottom"><span>Configuración</span></a>
+            
+            <div class="nav-profile-card" id="nav-profile-card">
+                <div class="profile-dropdown" id="profile-dropdown">
+                    <a href="/profile" class="dropdown-item">👤 Ver perfil</a>
+                    <a href="/logout" class="dropdown-item logout">🚪 Cerrar sesión</a>
+                </div>
+                <div class="nav-avatar">
+                    <img id="nav-avatar-img" src="" alt="" style="display:none;">
+                    <span id="nav-avatar-fallback">👤</span>
+                </div>
+                <div class="nav-user-info">
+                    <div class="nav-username" id="nav-username">Cargando...</div>
+                </div>
+                <div class="nav-dots">⋮</div>
+            </div>
         </div>
     </nav>
 
     <main id="content">
 
-        <div class="page-header">
-            <h1>Mi perfil</h1>
-            <p>Tu información personal y estadísticas de juego.</p>
+        <div class="page-header profile-page-header">
+            <div>
+                <h1>Mi Perfil</h1>
+                <p>Tu información personal y estadísticas de juego.</p>
+            </div>
+            <button class="btn btn-outline" id="btn-edit-profile">✏️ Editar Perfil</button>
         </div>
 
         <!-- Card de usuario -->
         <div class="profile-card">
-            <div class="profile-avatar">👤</div>
+            <div class="profile-avatar-wrap">
+                <div class="profile-avatar" id="profile-avatar-wrapper">
+                    <img id="profile-avatar-img" src="" alt="Avatar" style="display:none;">
+                    <span id="profile-avatar-fallback">👤</span>
+                </div>
+            </div>
+
             <div class="profile-info">
                 <h2 id="profile-name">—</h2>
-                <p class="username" id="profile-username">@—</p>
+                <p class="profile-username" id="profile-username">@—</p>
                 <div class="profile-meta">
                     <div class="profile-meta-item">
+                        <span class="meta-label">Correo electrónico</span>
                         <strong id="profile-email">—</strong>
-                        Correo
                     </div>
                     <div class="profile-meta-item">
+                        <span class="meta-label">Fecha de registro</span>
                         <strong id="profile-joined">—</strong>
-                        Miembro desde
                     </div>
                 </div>
             </div>
@@ -57,27 +85,31 @@
 
         <!-- Estadísticas -->
         <section class="content-section">
-            <h2>Estadísticas</h2>
+            <h2 class="section-title-alt">Rendimiento General</h2>
             <div class="stats-grid">
                 <div class="stat-card">
+                    <span class="stat-icon-bg">🎮</span>
                     <p class="stat-label">Partidas</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">total jugadas</p>
+                    <p class="stat-value" id="stat-total">—</p>
+                    <p class="stat-sub">Enfrentamientos totales</p>
                 </div>
                 <div class="stat-card">
+                    <span class="stat-icon-bg">🏆</span>
                     <p class="stat-label">Victorias</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">partidas ganadas</p>
+                    <p class="stat-value stat-win" id="stat-wins">—</p>
+                    <p class="stat-sub">Partidas ganadas</p>
                 </div>
                 <div class="stat-card">
+                    <span class="stat-icon-bg">💀</span>
                     <p class="stat-label">Derrotas</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">partidas perdidas</p>
+                    <p class="stat-value stat-loss" id="stat-losses">—</p>
+                    <p class="stat-sub">Partidas perdidas</p>
                 </div>
                 <div class="stat-card">
-                    <p class="stat-label">Empates</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">partidas empatadas</p>
+                    <span class="stat-icon-bg">⭐</span>
+                    <p class="stat-label">ELO Rating</p>
+                    <p class="stat-value stat-elo" id="stat-elo">—</p>
+                    <p class="stat-sub">Puntuación global</p>
                 </div>
             </div>
         </section>
@@ -85,11 +117,200 @@
     </main>
 
 </div>
+
+<!-- Modal: Editar Perfil -->
+<div class="modal-backdrop" id="modal-edit-profile" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="modal-title">
+        <div class="modal-header">
+            <h2 id="modal-title">Editar Perfil</h2>
+            <button class="modal-close" id="btn-modal-close" aria-label="Cerrar">×</button>
+        </div>
+        <form class="modal-body" id="form-edit-profile" novalidate>
+
+            <div class="form-group">
+                <label>Foto de perfil</label>
+                <div class="avatar-uploader" id="avatar-uploader">
+                    <div class="avatar-preview" id="avatar-preview">
+                        <img id="avatar-preview-img" src="" alt="Preview" style="display:none;">
+                        <span id="avatar-preview-placeholder">👤</span>
+                    </div>
+                    <div class="avatar-upload-info">
+                        <p class="avatar-upload-title">Cambiar imagen</p>
+                        <p class="avatar-upload-hint">JPG o PNG · Máx. 4MB</p>
+                        <button type="button" class="btn btn-ghost btn-sm" id="btn-pick-avatar">Seleccionar archivo</button>
+                        <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+                <p class="field-hint" id="avatar-upload-status"></p>
+            </div>
+
+            <div class="form-group">
+                <label for="edit-name">Nombre completo</label>
+                <input class="input" type="text" id="edit-name" name="name" placeholder="Tu nombre">
+            </div>
+
+            <div class="form-group">
+                <label for="edit-username">Nombre de usuario</label>
+                <input class="input" type="text" id="edit-username" name="username" placeholder="username">
+                <p class="field-hint" id="username-last-change"></p>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost" id="btn-cancel-edit">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-profile">Guardar cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/components/toast.js"></script>
+<script src="/scripts/sidebar.js"></script>
 <script>
-    document.querySelectorAll('#sidebar-nav a').forEach(link => {
-        if (new URL(link.href).pathname === window.location.pathname)
-            link.classList.add('active');
+    let currentUser = null;
+    let pendingAvatarFile = null;
+
+    async function loadProfile() {
+        try {
+            const res = await fetch('/api/me');
+            if (!res.ok) return;
+            currentUser = await res.json();
+            renderProfile(currentUser);
+        } catch (err) { console.error(err); }
+    }
+
+    function renderProfile(user) {
+        document.getElementById('profile-name').textContent     = user.name || '—';
+        document.getElementById('profile-username').textContent = '@' + (user.username || '—');
+        document.getElementById('profile-email').textContent    = user.email || '—';
+
+        if (user.created_at) {
+            const d = new Date(user.created_at);
+            document.getElementById('profile-joined').textContent = d.toLocaleDateString('es-ES', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+        }
+
+        const img      = document.getElementById('profile-avatar-img');
+        const fallback = document.getElementById('profile-avatar-fallback');
+        if (user.avatar_url) {
+            img.src = user.avatar_url + '?t=' + Date.now();
+            img.style.display = 'block';
+            fallback.style.display = 'none';
+        } else {
+            img.style.display = 'none';
+            fallback.style.display = 'flex';
+        }
+    }
+
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/me/stats');
+            if (!res.ok) return;
+            const s = await res.json();
+            document.getElementById('stat-total').textContent  = s.total_games ?? '0';
+            document.getElementById('stat-wins').textContent   = s.wins        ?? '0';
+            document.getElementById('stat-losses').textContent = s.losses      ?? '0';
+            document.getElementById('stat-elo').textContent    = s.elo_rating  ?? '1000';
+        } catch (err) { console.error(err); }
+    }
+
+    const backdrop = document.getElementById('modal-edit-profile');
+    const form     = document.getElementById('form-edit-profile');
+
+    function openModal() {
+        if (!currentUser) return;
+        document.getElementById('edit-name').value     = currentUser.name     || '';
+        document.getElementById('edit-username').value = currentUser.username || '';
+        pendingAvatarFile = null;
+        
+        const previewImg = document.getElementById('avatar-preview-img');
+        const previewPH  = document.getElementById('avatar-preview-placeholder');
+        if (currentUser.avatar_url) {
+            previewImg.src = currentUser.avatar_url;
+            previewImg.style.display = 'block';
+            previewPH.style.display  = 'none';
+        } else {
+            previewImg.style.display = 'none';
+            previewPH.style.display  = 'flex';
+        }
+
+        backdrop.classList.add('open');
+    }
+
+    function closeModal() { backdrop.classList.remove('open'); }
+
+    document.getElementById('btn-edit-profile').addEventListener('click', openModal);
+    document.getElementById('btn-modal-close').addEventListener('click', closeModal);
+    document.getElementById('btn-cancel-edit').addEventListener('click', closeModal);
+
+    const fileInput = document.getElementById('avatar-file-input');
+    document.getElementById('btn-pick-avatar').addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        if (file.size > 4 * 1024 * 1024) {
+            Toast.warning('El archivo supera los 4MB.');
+            return;
+        }
+        pendingAvatarFile = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById('avatar-preview-img').src = e.target.result;
+            document.getElementById('avatar-preview-img').style.display = 'block';
+            document.getElementById('avatar-preview-placeholder').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
     });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const saveBtn = document.getElementById('btn-save-profile');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Guardando...';
+
+        try {
+            let avatarUrl = currentUser.avatar_url;
+            if (pendingAvatarFile) {
+                const fd = new FormData();
+                fd.append('avatar', pendingAvatarFile);
+                const upRes = await fetch('/api/me/avatar', { method: 'POST', body: fd });
+                const upData = await upRes.json();
+                if (!upRes.ok) throw new Error(upData.error);
+                avatarUrl = upData.avatar_url;
+            }
+
+            const res = await fetch('/api/me/profile', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('edit-name').value,
+                    username: document.getElementById('edit-username').value,
+                    avatar_url: avatarUrl
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            Toast.success('Perfil actualizado correctamente.');
+            currentUser = { ...currentUser, ...data.user };
+            renderProfile(currentUser);
+            // Update sidebar too
+            const navAvatar = document.getElementById('nav-avatar-img');
+            if (navAvatar && currentUser.avatar_url) {
+                navAvatar.src = currentUser.avatar_url + '?t=' + Date.now();
+            }
+            closeModal();
+        } catch (err) {
+            Toast.error(err.message || 'Error al actualizar perfil.');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Guardar cambios';
+        }
+    });
+
+    loadProfile();
+    loadStats();
 </script>
 </body>
 </html>

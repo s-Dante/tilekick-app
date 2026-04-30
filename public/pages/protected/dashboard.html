@@ -4,8 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TileKick — Dashboard</title>
+    <title>TileKick — Inicio</title>
+    <meta name="description" content="Bienvenido a TileKick. Elige tu modo de juego, sube en el ranking y domina el tablero.">
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <link rel="stylesheet" href="/styles/protected/layout.css">
     <link rel="stylesheet" href="/styles/protected/dashboard.css">
 </head>
@@ -16,72 +18,90 @@
     <!-- Sidebar -->
     <nav id="sidebar">
         <div id="sidebar-header">
-            <h2>TileKick</h2>
+            <h2>TILEKICK</h2>
         </div>
+        
         <ul id="sidebar-nav">
-            <li><a href="/dashboard">Inicio</a></li>
-            <li><a href="/game/menu">Jugar</a></li>
-            <li><a href="/leaderboard">Clasificación</a></li>
-            <li><a href="/profile">Perfil</a></li>
-            <li><a href="/settings">Configuración</a></li>
+            <li><a href="/dashboard"><span>Inicio</span></a></li>
+            <li><a href="/game/menu"><span>Jugar</span></a></li>
+            <li><a href="/leaderboard"><span>Clasificación</span></a></li>
+            <li><a href="/rules"><span>Reglas</span></a></li>
         </ul>
-        <div id="sidebar-footer">
-            <a href="/logout" id="logout-btn">Cerrar sesión</a>
+
+        <div id="sidebar-bottom">
+            <a href="/settings" class="nav-link-bottom"><span>Configuración</span></a>
+            
+            <div class="nav-profile-card" id="nav-profile-card">
+                <div class="profile-dropdown" id="profile-dropdown">
+                    <a href="/profile" class="dropdown-item">👤 Ver perfil</a>
+                    <a href="/logout" class="dropdown-item logout">🚪 Cerrar sesión</a>
+                </div>
+                <div class="nav-avatar">
+                    <img id="nav-avatar-img" src="" alt="" style="display:none;">
+                    <span id="nav-avatar-fallback">👤</span>
+                </div>
+                <div class="nav-user-info">
+                    <div class="nav-username" id="nav-username">Cargando...</div>
+                </div>
+                <div class="nav-dots">⋮</div>
+            </div>
         </div>
     </nav>
 
     <!-- Contenido -->
     <main id="content">
 
-        <div class="page-header">
-            <h1>Dashboard</h1>
-            <p>Bienvenido de vuelta. Aquí está tu resumen.</p>
-        </div>
+        <!-- Hero -->
+        <section class="dash-hero">
+            <div class="dash-hero-text">
+                <h1>Juega estratégicamente<br>y diviértete</h1>
+                <p>Domina el tablero, desafía a tus amigos y conviértete en un estratega.</p>
+            </div>
+        </section>
 
-        <!-- Stats rápidos -->
-        <section class="content-section">
-            <h2>Tu desempeño</h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <p class="stat-label">Partidas</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">total jugadas</p>
+        <!-- Modos de juego -->
+        <section class="dash-modes">
+            <div class="mode-card">
+                <div class="mode-icon">🏛️</div>
+                <div class="mode-body">
+                    <h3>Modo Clásico</h3>
+                    <p class="mode-tag">Compite contra los mejores</p>
+                    <p class="mode-desc">Sube en el ranking global y gana recompensas exclusivas por tu desempeño estratégico.</p>
                 </div>
-                <div class="stat-card">
-                    <p class="stat-label">Victorias</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">partidas ganadas</p>
+            </div>
+            <div class="mode-card">
+                <div class="mode-icon">🫂</div>
+                <div class="mode-body">
+                    <h3>Modo Amistoso</h3>
+                    <p class="mode-tag">Juega sin presiones</p>
+                    <p class="mode-desc">Invita a tus amigos a partidas casuales para practicar nuevas tácticas y pasar un buen rato.</p>
                 </div>
-                <div class="stat-card">
-                    <p class="stat-label">Ranking</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">posición global</p>
-                </div>
-                <div class="stat-card">
-                    <p class="stat-label">Racha</p>
-                    <p class="stat-value">—</p>
-                    <p class="stat-sub">victorias seguidas</p>
+            </div>
+            <div class="mode-card">
+                <div class="mode-icon">🤖</div>
+                <div class="mode-body">
+                    <h3>Modo IA</h3>
+                    <p class="mode-tag">Juega y practica</p>
+                    <p class="mode-desc">Juega contra la IA para practicar tus estrategias antes de enfrentarte a otros jugadores.</p>
                 </div>
             </div>
         </section>
 
-        <!-- Accesos rápidos -->
-        <section class="content-section">
-            <h2>Acceso rápido</h2>
-            <div class="quick-links">
-                <a href="/game/menu" class="btn btn-primary">Buscar partida</a>
-                <a href="/leaderboard" class="btn btn-ghost">Ver clasificación</a>
-            </div>
-        </section>
-
-        <!-- Actividad reciente -->
-        <section class="content-section">
-            <h2>Actividad reciente</h2>
-            <div class="activity-list">
-                <div class="activity-item">
-                    <span>Sin partidas recientes</span>
-                    <span class="activity-meta">—</span>
+        <!-- CTAs -->
+        <section class="dash-ctas">
+            <div class="cta-card cta-primary">
+                <div class="cta-text">
+                    <h2>¿Listo para empezar tu primera partida?</h2>
+                    <p>Elige un modo de juego y demuestra tus habilidades.</p>
                 </div>
+                <a href="/game/menu" class="btn btn-primary" id="btn-play-now">Jugar Ahora</a>
+            </div>
+            <div class="cta-card cta-secondary">
+                <div class="cta-text">
+                    <h2>¿Nuevo en TileKick?</h2>
+                    <p>Aprende las reglas y mecánicas antes de lanzarte al juego.</p>
+                </div>
+                <a href="/rules" class="btn btn-outline" id="btn-learn-rules">Aprende lo básico</a>
             </div>
         </section>
 
@@ -89,13 +109,7 @@
 
 </div>
 
-<script>
-    // Marcar el nav activo según URL actual
-    document.querySelectorAll('#sidebar-nav a').forEach(link => {
-        if (new URL(link.href).pathname === window.location.pathname) {
-            link.classList.add('active');
-        }
-    });
-</script>
+<script src="/js/components/toast.js"></script>
+<script src="/scripts/sidebar.js"></script>
 </body>
 </html>

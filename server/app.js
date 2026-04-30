@@ -6,10 +6,14 @@ import mysql from 'mysql2';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
+import nodemailer from 'nodemailer';
+import multer from 'multer';
+import sharp from 'sharp';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -29,10 +33,12 @@ const pages = {
     welcome: page('index.html'),
     login: page('auth/login.html'),
     register: page('auth/register.html'),
+    recovery: page('auth/recovery.html'),
     dashboard: page('protected/dashboard.html'),
     profile: page('protected/profile.html'),
     settings: page('protected/settings.html'),
     leaderboard: page('protected/leaderboard.html'),
+    rules: page('protected/rules.html'),
     gameMenu: page('protected/game/menu.html'),
     gameWaiting: page('protected/game/waiting.html'),
     game2D: page('protected/game/game2d.html'),
@@ -46,6 +52,20 @@ app.use(cookieParser());
 app.use(express.static(publicDir));
 
 app.use('/engine', express.static(path.join(__dirname, '..', 'engine')));
+app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
+
+// Multer — solo en memoria, sharp se encarga del disco
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 4 * 1024 * 1024 },  // 4 MB
+    fileFilter: (_req, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        cb(null, allowed.includes(file.mimetype));
+    },
+});
+
+const avatarsDir = path.join(__dirname, '..', 'storage', 'avatars');
+if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
 
 /**
  * Database
@@ -64,6 +84,34 @@ db.connect((err) => {
     }
     console.log('Conectado a la base de datos');
 });
+
+/**
+ * Mailer — Nodemailer con SMTPS (puerto 465)
+ */
+function createMailer() {
+    return nodemailer.createTransport({
+        host: process.env.MAIL_HOST,
+        port: parseInt(process.env.MAIL_PORT) || 465,
+        secure: true, // smtps
+        auth: {
+            user: process.env.MAIL_USERNAME,
+            pass: process.env.MAIL_PASSWORD,
+        },
+    });
+}
+
+/**
+ * Recovery — Sesiones temporales
+ * sessionKeys: Map<sessionKey, { userId, expiresAt }> — válido 10 min tras verificar
+ */
+const sessionKeys = new Map();
+
+function generateToken(len = 8) {
+    return randomBytes(Math.ceil(len / 2))
+        .toString('hex')
+        .toUpperCase()
+        .slice(0, len);
+}
 
 /**
  * Middleware de autenticación
@@ -173,12 +221,24 @@ app.route('/register')
                 return res.status(409).json({ error: 'El usuario o correo ya está registrado' });
             }
 
-            const sql = `INSERT INTO users (name, username, email, password, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`;
-            db.query(sql, [name, username, email, hashedPassword, now, now], (err2) => {
+            const sql = `INSERT INTO users (name, username, email, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`;
+            db.query(sql, [name, username, email, hashedPassword, now, now], (err2, result2) => {
                 if (err2) {
                     console.error('Error al registrar usuario:', err2.stack);
                     return res.status(500).json({ error: 'Error al registrar usuario' });
                 }
+
+                // Auto-crear registros de achievements y preferences para el nuevo usuario
+                const newUserId = result2.insertId;
+                db.query(
+                    `INSERT IGNORE INTO user_achievements (user_id) VALUES (?)`,
+                    [newUserId]
+                );
+                db.query(
+                    `INSERT IGNORE INTO user_preferences (user_id) VALUES (?)`,
+                    [newUserId]
+                );
+
                 res.status(201).json({ message: 'Usuario registrado exitosamente' });
             });
         });
@@ -188,6 +248,180 @@ app.route('/register')
 app.get('/logout', (req, res) => {
     res.clearCookie('auth_token');
     res.redirect('/login');
+});
+
+// Recovery — Vista
+app.get('/recovery', (req, res) => {
+    res.sendFile(pages.recovery);
+});
+
+/**
+ * API — Recovery de contraseña
+ *
+ * STEP 1: POST /api/recovery/request  → genera token 8-chars, lo guarda en BD, envía correo
+ * STEP 2: POST /api/recovery/verify   → valida token, devuelve sessionKey temporal
+ * STEP 3: POST /api/recovery/reset    → con sessionKey cambia la contraseña
+ */
+
+// STEP 1 — Solicitar código
+app.post('/api/recovery/request', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'El correo es requerido.' });
+
+    const findSql = `SELECT id FROM users WHERE email = ?`;
+    db.query(findSql, [email], async (err, rows) => {
+        if (err) {
+            console.error('[Recovery] Error al buscar usuario:', err);
+            return res.status(500).json({ error: 'Error interno del servidor.' });
+        }
+
+        // Siempre respondemos OK para no filtrar si el correo existe
+        if (rows.length === 0) {
+            return res.json({ ok: true });
+        }
+
+        const userId = rows[0].id;
+        const token = generateToken(8);
+        const now = new Date();
+        const expires = new Date(now.getTime() + 15 * 60 * 1000); // +15 min
+
+        // Invalidar tokens previos del usuario
+        const invalidateSql = `UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0`;
+        db.query(invalidateSql, [userId]);
+
+        // Insertar nuevo token
+        const insertSql = `INSERT INTO password_resets (token, expires_at, used, created_at, updated_at, user_id)
+                           VALUES (?, ?, 0, ?, ?, ?)`;
+        db.query(insertSql, [token, expires, now, now, userId], async (err2) => {
+            if (err2) {
+                console.error('[Recovery] Error al insertar token:', err2);
+                return res.status(500).json({ error: 'Error al generar el código.' });
+            }
+
+            // Enviar correo
+            try {
+                const mailer = createMailer();
+                await mailer.sendMail({
+                    from: `"${process.env.MAIL_FROM_NAME || 'TileKick'}" <${process.env.MAIL_FROM_ADDRESS}>`,
+                    to: email,
+                    subject: 'Código de recuperación — TileKick',
+                    html: `
+                        <div style="font-family: 'Inter', Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #e8e8e0; border-radius: 16px; overflow: hidden;">
+                            <div style="background: #354024; padding: 32px; text-align: center;">
+                                <h1 style="color: #e5d7c4; font-size: 28px; margin: 0; letter-spacing: -0.02em;">TileKick</h1>
+                            </div>
+                            <div style="padding: 40px 32px;">
+                                <h2 style="color: #333; font-size: 20px; margin: 0 0 12px;">Recupera tu contraseña</h2>
+                                <p style="color: #555; font-size: 15px; line-height: 1.6; margin: 0 0 28px;">
+                                    Usa el siguiente código para restablecer tu contraseña.
+                                    Este código es válido por <strong>15 minutos</strong>.
+                                </p>
+                                <div style="background: #d4d4c8; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 28px;">
+                                    <span style="font-size: 36px; font-weight: 800; letter-spacing: 0.18em; color: #354024; font-family: monospace;">${token}</span>
+                                </div>
+                                <p style="color: #777; font-size: 13px; margin: 0;">
+                                    Si no solicitaste este código, puedes ignorar este correo.
+                                </p>
+                            </div>
+                        </div>
+                    `,
+                });
+                console.log(`[Recovery] Token enviado a ${email}`);
+            } catch (mailErr) {
+                console.error('[Recovery] Error al enviar correo:', mailErr);
+                return res.status(500).json({ error: 'No se pudo enviar el correo. Verifica la configuración de correo.' });
+            }
+
+            res.json({ ok: true });
+        });
+    });
+});
+
+// STEP 2 — Verificar token
+app.post('/api/recovery/verify', (req, res) => {
+    const { email, token } = req.body;
+    if (!email || !token) return res.status(400).json({ error: 'Datos incompletos.' });
+
+    const sql = `
+        SELECT pr.id, pr.user_id, pr.expires_at
+        FROM password_resets pr
+        JOIN users u ON u.id = pr.user_id
+        WHERE u.email = ?
+          AND pr.token = ?
+          AND pr.used  = 0
+        ORDER BY pr.created_at DESC
+        LIMIT 1
+    `;
+    db.query(sql, [email, token.toUpperCase()], (err, rows) => {
+        if (err) {
+            console.error('[Recovery] Error al verificar token:', err);
+            return res.status(500).json({ error: 'Error interno del servidor.' });
+        }
+
+        if (rows.length === 0) {
+            return res.status(400).json({ error: 'Código incorrecto o ya utilizado.' });
+        }
+
+        const row = rows[0];
+        if (new Date() > new Date(row.expires_at)) {
+            return res.status(400).json({ error: 'El código ha expirado. Solicita uno nuevo.' });
+        }
+
+        // Generar sessionKey temporal (10 min)
+        const key = randomUUID();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        sessionKeys.set(key, { userId: row.user_id, resetId: row.id, expiresAt });
+
+        // Auto-limpiar la sessionKey al expirar
+        setTimeout(() => sessionKeys.delete(key), 10 * 60 * 1000);
+
+        res.json({ ok: true, sessionKey: key });
+    });
+});
+
+// STEP 3 — Cambiar contraseña
+app.post('/api/recovery/reset', async (req, res) => {
+    const { sessionKey, newPassword, confirmPassword } = req.body;
+    if (!sessionKey || !newPassword || !confirmPassword) {
+        return res.status(400).json({ error: 'Datos incompletos.' });
+    }
+    if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: 'Las contraseñas no coinciden.' });
+    }
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
+    }
+
+    const session = sessionKeys.get(sessionKey);
+    if (!session) {
+        return res.status(400).json({ error: 'Sesión inválida o expirada. Reinicia el proceso.' });
+    }
+    if (new Date() > session.expiresAt) {
+        sessionKeys.delete(sessionKey);
+        return res.status(400).json({ error: 'La sesión expiró. Reinicia el proceso.' });
+    }
+
+    const saltRounds = parseInt(process.env.SALT_ROUNDS) || 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+    const now = new Date();
+
+    const updateSql = `UPDATE users SET password = ?, updated_at = ? WHERE id = ?`;
+    db.query(updateSql, [hashedPassword, now, session.userId], (err) => {
+        if (err) {
+            console.error('[Recovery] Error al actualizar contraseña:', err);
+            return res.status(500).json({ error: 'Error al cambiar la contraseña.' });
+        }
+
+        // Marcar el token como usado
+        const markSql = `UPDATE password_resets SET used = 1, updated_at = ? WHERE id = ?`;
+        db.query(markSql, [now, session.resetId]);
+
+        // Invalidar la sessionKey
+        sessionKeys.delete(sessionKey);
+
+        console.log(`[Recovery] Contraseña actualizada para userId ${session.userId}`);
+        res.json({ ok: true, message: 'Contraseña actualizada exitosamente.' });
+    });
 });
 
 /**
@@ -207,6 +441,10 @@ app.get('/settings', requireAuth, (req, res) => {
 
 app.get('/leaderboard', requireAuth, (req, res) => {
     res.sendFile(pages.leaderboard);
+});
+
+app.get('/rules', requireAuth, (req, res) => {
+    res.sendFile(pages.rules);
 });
 
 app.get('/game/menu', requireAuth, (req, res) => {
@@ -229,7 +467,262 @@ app.get('/game/3d', requireAuth, (req, res) => {
  * API — Usuario actual
  */
 app.get('/api/me', requireAuth, (req, res) => {
-    res.json(req.user);
+    // Incluimos username_changed_at para el cooldown del perfil
+    const sql = `SELECT id, name, username, email, avatar_url, created_at, username_changed_at FROM users WHERE id = ?`;
+    db.query(sql, [req.user.id], (err, rows) => {
+        if (err || rows.length === 0) return res.json(req.user);
+        res.json(rows[0]);
+    });
+});
+
+/**
+ * API — Estadísticas del usuario
+ */
+app.get('/api/me/stats', requireAuth, (req, res) => {
+    const sql = `SELECT elo_rating, wins, losses, draws, total_games, win_streak, best_streak
+                 FROM user_achievements WHERE user_id = ?`;
+    db.query(sql, [req.user.id], (err, rows) => {
+        if (err) {
+            console.error('[API] Error al cargar stats:', err);
+            return res.status(500).json({ error: 'Error al obtener estadísticas.' });
+        }
+        if (rows.length === 0) return res.json({ elo_rating: 1000, wins: 0, losses: 0, draws: 0, total_games: 0 });
+        res.json(rows[0]);
+    });
+});
+
+/**
+ * API — Editar perfil (PATCH /api/me/profile)
+ * Campos editables: name, username (cooldown 30 días), avatar_url
+ */
+app.patch('/api/me/profile', requireAuth, async (req, res) => {
+    const { name, username, avatar_url } = req.body;
+    const userId = req.user.id;
+    const now = new Date();
+
+    if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: 'El nombre debe tener al menos 2 caracteres.' });
+    }
+
+    // 1. Obtener datos actuales del usuario para validaciones
+    const userSql = `SELECT id, username, username_changed_at FROM users WHERE id = ?`;
+    db.query(userSql, [userId], (err, rows) => {
+        if (err || rows.length === 0) {
+            console.error('[API] Error al obtener usuario para PATCH:', err, userId);
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+
+        const current = rows[0];
+        let newUsername = current.username;
+
+        const performUpdate = () => {
+            const usernameChanged = newUsername !== current.username;
+            const updateSql = `
+                UPDATE users
+                SET name = ?,
+                    username = ?,
+                    avatar_url = ?,
+                    username_changed_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+            `;
+            db.query(
+                updateSql,
+                [
+                    name.trim(),
+                    newUsername,
+                    avatar_url || null,
+                    usernameChanged ? now : current.username_changed_at,
+                    now,
+                    userId,
+                ],
+                (err3) => {
+                    if (err3) {
+                        console.error('[API] Error al actualizar perfil:', err3);
+                        return res.status(500).json({ error: 'Error al guardar los cambios.' });
+                    }
+                    res.json({
+                        ok: true,
+                        user: {
+                            name: name.trim(),
+                            username: newUsername,
+                            avatar_url: avatar_url || null,
+                            username_changed_at: usernameChanged ? now : current.username_changed_at,
+                        }
+                    });
+                }
+            );
+        };
+
+        // Validar cambio de username
+        if (username && username.trim() !== current.username) {
+            // Cooldown 30 días
+            if (current.username_changed_at) {
+                const lastChange = new Date(current.username_changed_at);
+                const nextAllowed = new Date(lastChange);
+                nextAllowed.setDate(nextAllowed.getDate() + 30);
+                if (now < nextAllowed) {
+                    const days = Math.ceil((nextAllowed - now) / (1000 * 60 * 60 * 24));
+                    return res.status(400).json({ error: `Puedes cambiar tu username en ${days} día(s).` });
+                }
+            }
+
+            // Formato
+            if (!/^[a-zA-Z0-9_]{3,30}$/.test(username.trim())) {
+                return res.status(400).json({ error: 'Formato de username inválido.' });
+            }
+
+            // Unicidad
+            db.query(`SELECT id FROM users WHERE username = ? AND id != ?`, [username.trim(), userId], (err2, existing) => {
+                if (err2) return res.status(500).json({ error: 'Error al verificar username.' });
+                if (existing.length > 0) return res.status(409).json({ error: 'Ese username ya está en uso.' });
+
+                newUsername = username.trim();
+                performUpdate();
+            });
+        } else {
+            performUpdate();
+        }
+    });
+});
+
+/**
+ * API — Preferencias de juego (GET + PATCH /api/me/preferences)
+ */
+app.get('/api/me/preferences', requireAuth, (req, res) => {
+    const sql = `SELECT graphics_quality, music_volume, sfx_volume, show_fps, language
+                 FROM user_preferences WHERE user_id = ?`;
+    db.query(sql, [req.user.id], (err, rows) => {
+        if (err) {
+            console.error('[API] Error al cargar preferencias:', err);
+            return res.status(500).json({ error: 'Error al obtener preferencias.' });
+        }
+        if (rows.length === 0) {
+            return res.json({ graphics_quality: 2, music_volume: 80, sfx_volume: 80, show_fps: 0, language: 'es' });
+        }
+        res.json(rows[0]);
+    });
+});
+
+app.patch('/api/me/preferences', requireAuth, (req, res) => {
+    const { graphics_quality, music_volume, sfx_volume, show_fps, language } = req.body;
+    const userId = req.user.id;
+    const now = new Date();
+
+    // Validaciones básicas
+    const gq = parseInt(graphics_quality);
+    const mv = parseInt(music_volume);
+    const sv = parseInt(sfx_volume);
+    const sf = show_fps ? 1 : 0;
+    const lang = ['es', 'en'].includes(language) ? language : 'es';
+
+    if (isNaN(gq) || gq < 1 || gq > 4) return res.status(400).json({ error: 'Calidad gráfica inválida.' });
+    if (isNaN(mv) || mv < 0 || mv > 100) return res.status(400).json({ error: 'Volumen de música inválido.' });
+    if (isNaN(sv) || sv < 0 || sv > 100) return res.status(400).json({ error: 'Volumen de efectos inválido.' });
+
+    const upsertSql = `
+        INSERT INTO user_preferences (user_id, graphics_quality, music_volume, sfx_volume, show_fps, language, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            graphics_quality = VALUES(graphics_quality),
+            music_volume     = VALUES(music_volume),
+            sfx_volume       = VALUES(sfx_volume),
+            show_fps         = VALUES(show_fps),
+            language         = VALUES(language),
+            updated_at       = VALUES(updated_at)
+    `;
+    db.query(upsertSql, [userId, gq, mv, sv, sf, lang, now], (err) => {
+        if (err) {
+            console.error('[API] Error al guardar preferencias:', err);
+            return res.status(500).json({ error: 'Error al guardar las preferencias.' });
+        }
+        res.json({ ok: true });
+    });
+});
+
+/**
+ * API — Subir avatar (POST /api/me/avatar)
+ * Procesa la imagen con sharp, la guarda como .webp en storage/avatars/
+ */
+app.post('/api/me/avatar', requireAuth, upload.single('avatar'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+    }
+
+    try {
+        const userId   = req.user.id;
+        const filename = `${userId}_${Date.now()}.webp`;
+        const outPath  = path.join(avatarsDir, filename);
+
+        // Convertir a webp, redimensionar a máx 256x256 manteniendo ratio
+        await sharp(req.file.buffer)
+            .resize(256, 256, { fit: 'cover', position: 'centre' })
+            .webp({ quality: 85 })
+            .toFile(outPath);
+
+        const avatarUrl = `/storage/avatars/${filename}`;
+
+        // Borrar el avatar anterior si existía
+        const prevSql = `SELECT avatar_url FROM users WHERE id = ?`;
+        db.query(prevSql, [userId], (err, rows) => {
+            if (!err && rows.length > 0 && rows[0].avatar_url) {
+                const oldUrl  = rows[0].avatar_url;
+                // Solo borrar si es un archivo local nuestro
+                if (oldUrl.startsWith('/storage/avatars/')) {
+                    const oldPath = path.join(__dirname, '..', oldUrl);
+                    fs.unlink(oldPath, () => {});   // Silencioso si ya no existe
+                }
+            }
+        });
+
+        // Actualizar BD
+        const now = new Date();
+        db.query(
+            `UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?`,
+            [avatarUrl, now, userId],
+            (err) => {
+                if (err) {
+                    console.error('[Avatar] Error al guardar URL en BD:', err);
+                    return res.status(500).json({ error: 'Error al guardar el avatar.' });
+                }
+                res.json({ ok: true, avatar_url: avatarUrl });
+            }
+        );
+    } catch (err) {
+        console.error('[Avatar] Error al procesar imagen:', err);
+        res.status(500).json({ error: 'Error al procesar la imagen.' });
+    }
+});
+
+/**
+ * API — Leaderboard global (GET /api/leaderboard)
+ * Devuelve todos los jugadores con stats, ordenados por ELO desc
+ */
+app.get('/api/leaderboard', requireAuth, (req, res) => {
+    const sql = `
+        SELECT
+            u.id,
+            u.username,
+            u.name,
+            u.avatar_url,
+            COALESCE(ua.elo_rating,  1000) AS elo_rating,
+            COALESCE(ua.wins,        0)    AS wins,
+            COALESCE(ua.losses,      0)    AS losses,
+            COALESCE(ua.draws,       0)    AS draws,
+            COALESCE(ua.total_games, 0)    AS total_games,
+            COALESCE(ua.win_streak,  0)    AS win_streak
+        FROM users u
+        LEFT JOIN user_achievements ua ON ua.user_id = u.id
+        WHERE u.deleted_at IS NULL
+        ORDER BY elo_rating DESC, wins DESC
+    `;
+    db.query(sql, (err, rows) => {
+        if (err) {
+            console.error('[Leaderboard] Error:', err);
+            return res.status(500).json({ error: 'Error al obtener el ranking.' });
+        }
+        res.json(rows);
+    });
 });
 
 /**

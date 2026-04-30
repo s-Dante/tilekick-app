@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TileKick — Iniciar sesión</title>
     <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <link rel="stylesheet" href="/styles/auth/auth.css">
 </head>
 
@@ -32,12 +33,10 @@
                 <label for="password">Contraseña</label>
                 <input class="input" type="password" id="password" name="password"
                        placeholder="Tu contraseña" autocomplete="current-password">
-                <a href="#" class="auth-inline-link">¿Olvidaste tu contraseña?</a>
+                <a href="/recovery" class="auth-inline-link">¿Olvidaste tu contraseña?</a>
             </div>
 
-            <p id="errorMsg" class="error-msg"></p>
-
-            <button type="submit" class="btn btn-primary btn-submit">Iniciar sesión</button>
+            <button type="submit" id="loginBtn" class="btn btn-primary btn-submit">Iniciar sesión</button>
 
         </form>
 
@@ -47,31 +46,47 @@
 
     </div>
 
+    <script src="/js/components/toast.js"></script>
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        const form = document.getElementById('loginForm');
+        const btn  = document.getElementById('loginBtn');
+
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const errorMsg = document.getElementById('errorMsg');
-            errorMsg.style.display = 'none';
 
-            const body = {
-                username: document.getElementById('username').value.trim(),
-                password: document.getElementById('password').value,
-            };
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
 
-            const res  = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            const data = await res.json();
-
-            if (!res.ok) {
-                errorMsg.textContent   = data.error || 'Error al iniciar sesión';
-                errorMsg.style.display = 'block';
+            if (!username || !password) {
+                Toast.warning('Por favor completa todos los campos.', { position: 'top-center' });
                 return;
             }
 
-            window.location.href = '/dashboard';
+            btn.disabled    = true;
+            btn.textContent = 'Ingresando…';
+
+            try {
+                const res  = await fetch('/login', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ username, password }),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    Toast.error(data.error || 'Error al iniciar sesión.', { position: 'top-center' });
+                    return;
+                }
+
+                Toast.success('¡Bienvenido!', { position: 'top-center', duration: 1500 });
+                setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+
+            } catch {
+                Toast.error('No se pudo conectar con el servidor.', { position: 'top-center' });
+            } finally {
+                btn.disabled    = false;
+                btn.textContent = 'Iniciar sesión';
+            }
         });
     </script>
 

@@ -5,7 +5,7 @@
 
 export const ROWS = 10;
 export const COLS = 5;
-export const LEVELS = 3;   // 0 = sin pisar · 1 = pisado 1 vez · 2 = pisado 2 veces (impasable)
+export const LEVELS = 3;   // 0 = sin pisar · 1 = pisado 1 vez · 2 = pisado 2 veces · 3 = pisado 3 veces (impasable)
 
 // ──────────────────────────────────────────────────────────────
 //  Mapeo nombre-de-mapa → tema visual
@@ -38,19 +38,22 @@ const MAP_COLORS = {
         goal: '#e8e8e0',                   // portería: blanco cálido
         level0: ['#22c55e', '#4ade80'],      // verde vivo  (sin pisar)
         level1: ['#16a34a', '#22c55e'],      // verde medio (pisado 1 vez)
-        level2: ['#14532d', '#166534'],      // verde oscuro (impasable)
+        level2: ['#14532d', '#166534'],      // verde oscuro (pisado 2 veces)
+        level3: ['#14532d', '#166534'],      // verde muy oscuro (pisado 3 veces impasable)
     },
     sand: {
         goal: '#e8e8e0',
         level0: ['#ca8a04', '#eab308'],      // arena dorada viva
         level1: ['#a16207', '#ca8a04'],      // arena oscura
-        level2: ['#78350f', '#92400e'],      // arena muy oscura (impasable)
+        level2: ['#78350f', '#92400e'],      // arena muy oscura
+        level3: ['#14532d', '#166534'],      // arena muy oscura (pisado 3 veces impasable)|
     },
     cement: {
         goal: '#e8e8e0',
         level0: ['#6b7280', '#9ca3af'],      // gris claro
         level1: ['#4b5563', '#6b7280'],      // gris oscuro
-        level2: ['#1f2937', '#374151'],      // casi negro (impasable)
+        level2: ['#1f2937', '#374151'],      // casi negro
+        level3: ['#14532d', '#166534'],      // arena muy oscura (pisado 3 veces impasable) 
     },
 };
 
@@ -77,7 +80,8 @@ export class Board {
          * stomped[row][col] = nivel de profundidad de la casilla
          *   0 → sin pisar     (nivel superior, color más vivo)
          *   1 → pisada 1 vez  (un nivel abajo, color más opaco)
-         *   2 → pisada 2 veces (impasable, nivel más profundo)
+         *   2 → pisada 2 veces
+         *   3 → pisada 3 veces (nivel más profundo impasable)
          *
          * Las casillas de la portería (fila 0 y fila 9, cols 1-3)
          * nunca cambian de nivel; siempre quedan en 0.

@@ -92,14 +92,16 @@ export function buildInitialPieces() {
         new Piece({ id: 'A-GK', type: PIECE_TYPES.GOALKEEPER, team: 'A', row: 0, col: 2 }),
         new Piece({ id: 'A-DEF1', type: PIECE_TYPES.DEFENDER, team: 'A', row: 1, col: 1 }),
         new Piece({ id: 'A-DEF2', type: PIECE_TYPES.DEFENDER, team: 'A', row: 1, col: 3 }),
-        new Piece({ id: 'A-FWD1', type: PIECE_TYPES.FORWARD, team: 'A', row: 2, col: 2, hasBall: true }),
-        new Piece({ id: 'A-FWD2', type: PIECE_TYPES.FORWARD, team: 'A', row: 2, col: 0 }),
+        new Piece({ id: 'A-FWD1', type: PIECE_TYPES.FORWARD, team: 'A', row: 2, col: 0 }),
+        new Piece({ id: 'A-FWD2', type: PIECE_TYPES.FORWARD, team: 'A', row: 2, col: 2, hasBall: true }),
+        new Piece({ id: 'A-FWD3', type: PIECE_TYPES.FORWARD, team: 'A', row: 2, col: 4 }),
 
         // Equipo B
         new Piece({ id: 'B-GK', type: PIECE_TYPES.GOALKEEPER, team: 'B', row: 9, col: 2 }),
         new Piece({ id: 'B-DEF1', type: PIECE_TYPES.DEFENDER, team: 'B', row: 8, col: 1 }),
         new Piece({ id: 'B-DEF2', type: PIECE_TYPES.DEFENDER, team: 'B', row: 8, col: 3 }),
-        new Piece({ id: 'B-FWD1', type: PIECE_TYPES.FORWARD, team: 'B', row: 7, col: 2 }),
-        new Piece({ id: 'B-FWD2', type: PIECE_TYPES.FORWARD, team: 'B', row: 7, col: 4 }),
+        new Piece({ id: 'B-FWD1', type: PIECE_TYPES.FORWARD, team: 'B', row: 7, col: 0 }),
+        new Piece({ id: 'B-FWD2', type: PIECE_TYPES.FORWARD, team: 'B', row: 7, col: 2 }),
+        new Piece({ id: 'B-FWD3', type: PIECE_TYPES.FORWARD, team: 'B', row: 7, col: 4 }),
     ];
 }
