@@ -918,53 +918,93 @@ io.on('connection', (socket) => {
     console.log(`[Socket] Conectado: ${socket.id}`);
 
     // --- El jugador entra a la sala de espera ---
-    socket.on('join-waiting-room', ({ mode, map, gameType, username }) => {
+    socket.on('join-waiting-room', ({ mode, map, gameType, username, goals, time, random }) => {
         if (mode !== 'online') return;
 
-        const key = `${map}:${gameType}`;
-        const waiting = waitingQueue.get(key);
+        const goalLimit = parseInt(goals ?? '5', 10) || 5;
+        const timeSecs  = parseInt(time  ?? '0', 10) || 0;
+        const isRandom  = random === true || random === 'true';
 
-        // Evitar que el mismo usuario juegue contra sí mismo (misma sesión / misma pestaña)
-        if (waiting && waiting.username === username) {
-            socket.emit('self-play-error', { message: 'Ya estás buscando partida en esta modalidad. No puedes jugar contra ti mismo.' });
-            return;
+        // Anti self-play: revisar TODAS las entradas de la cola
+        for (const [, entry] of waitingQueue) {
+            if (entry.username === username) {
+                socket.emit('self-play-error', { message: 'Ya estás buscando partida. No puedes jugar contra ti mismo.' });
+                return;
+            }
         }
 
-        if (waiting) {
-            waitingQueue.delete(key);
+        // ── Buscar candidato ───────────────────────────────────────
+        let matchKey   = null;
+        let matchEntry = null;
+
+        if (isRandom) {
+            // Partida aleatoria → aceptar cualquier oponente en espera
+            const firstEntry = [...waitingQueue.entries()][0];
+            if (firstEntry) {
+                [matchKey, matchEntry] = firstEntry;
+            }
+        } else {
+            // Partida específica → primero buscar coincidencia exacta (map+gameType)
+            const specificKey = `${map}:${gameType}`;
+            if (waitingQueue.has(specificKey)) {
+                matchKey   = specificKey;
+                matchEntry = waitingQueue.get(specificKey);
+            } else if (waitingQueue.has('any:any')) {
+                // Fallback: hay alguien esperando partida aleatoria → emparejamos
+                matchKey   = 'any:any';
+                matchEntry = waitingQueue.get('any:any');
+            }
+        }
+
+        if (matchEntry) {
+            waitingQueue.delete(matchKey);
             socket.data.waitingKey = null;
+
+            // Determinar configuración de la sala:
+            // Usar los parámetros del jugador con modalidad específica; si ambos son
+            // aleatorios, usar estadio_clasico / 2d como defaults.
+            const matchMap       = !isRandom ? map      : (matchEntry.map      ?? 'estadio_clasico');
+            const matchGameType  = !isRandom ? gameType : (matchEntry.gameType ?? '2d');
+            const matchGoalLimit = !isRandom ? goalLimit : (matchEntry.goalLimit ?? 5);
+            const matchTimeSecs  = !isRandom ? timeSecs  : (matchEntry.timeSecs  ?? 0);
 
             const roomId = randomUUID().slice(0, 8).toUpperCase();
 
-            // Inicializar sala en activeRooms para tracking de la partida
             activeRooms.set(roomId, {
-                map,
-                gameType,
-                matchId: null,
+                map:           matchMap,
+                gameType:      matchGameType,
+                goalLimit:     matchGoalLimit,
+                timeSecs:      matchTimeSecs,
+                matchId:       null,
                 matchCreating: false,
-                finished: false,
-                players: new Map(),
+                finished:      false,
+                players:       new Map(),
             });
 
             socket.join(roomId);
-            const opponentSocket = io.sockets.sockets.get(waiting.socketId);
+            const opponentSocket = io.sockets.sockets.get(matchEntry.socketId);
             opponentSocket?.join(roomId);
 
             io.to(roomId).emit('match-found', {
                 roomId,
-                gameType,
+                map:       matchMap,
+                gameType:  matchGameType,
+                goalLimit: matchGoalLimit,
+                timeSecs:  matchTimeSecs,
                 players: [
-                    { socketId: waiting.socketId, username: waiting.username },
+                    { socketId: matchEntry.socketId, username: matchEntry.username },
                     { socketId: socket.id, username },
                 ],
             });
 
-            console.log(`[Match] Room ${roomId}: ${waiting.username} vs ${username} | ${map} ${gameType.toUpperCase()}`);
+            console.log(`[Match] Room ${roomId}: ${matchEntry.username} vs ${username} | ${matchMap} ${matchGameType.toUpperCase()} | goals=${matchGoalLimit} time=${matchTimeSecs}s`);
         } else {
-            waitingQueue.set(key, { socketId: socket.id, username });
-            socket.data.waitingKey = key;
+            // Nadie disponible → entrar en cola
+            const queueKey = isRandom ? 'any:any' : `${map}:${gameType}`;
+            waitingQueue.set(queueKey, { socketId: socket.id, username, map, gameType, goalLimit, timeSecs });
+            socket.data.waitingKey = queueKey;
             socket.emit('waiting', { count: 1 });
-            console.log(`[Queue] ${username} esperando: ${key}`);
+            console.log(`[Queue] ${username} esperando: ${queueKey}`);
         }
     });
 

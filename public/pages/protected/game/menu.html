@@ -157,9 +157,50 @@
                     </div>
                 </div>
 
-                <!-- Sección 4: Dificultad IA (solo visible en modo IA) -->
+                <!-- Sección 4: Reglas de partida -->
+                <div class="menu-section" id="rules-section">
+                    <h2 class="section-title">4. Reglas de Partida</h2>
+                    <div class="rules-grid">
+                        <div class="rules-group">
+                            <div class="rules-group-label">⚽ Goles para ganar</div>
+                            <div class="rules-chips">
+                                <label class="chip-card">
+                                    <input type="radio" name="goals" value="3">
+                                    <span class="chip-label">3 goles</span>
+                                </label>
+                                <label class="chip-card">
+                                    <input type="radio" name="goals" value="5" checked>
+                                    <span class="chip-label">5 goles</span>
+                                </label>
+                                <label class="chip-card">
+                                    <input type="radio" name="goals" value="7">
+                                    <span class="chip-label">7 goles</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="rules-group">
+                            <div class="rules-group-label">⏱ Límite de tiempo</div>
+                            <div class="rules-chips">
+                                <label class="chip-card">
+                                    <input type="radio" name="time" value="0" checked>
+                                    <span class="chip-label">Ilimitado</span>
+                                </label>
+                                <label class="chip-card">
+                                    <input type="radio" name="time" value="300">
+                                    <span class="chip-label">Tradicional <small>5 min</small></span>
+                                </label>
+                                <label class="chip-card">
+                                    <input type="radio" name="time" value="180">
+                                    <span class="chip-label">Blitz <small>3 min</small></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 5: Dificultad IA (solo visible en modo IA) -->
                 <div class="menu-section" id="ai-difficulty-section" style="display:none;">
-                    <h2 class="section-title">4. Dificultad de la IA</h2>
+                    <h2 class="section-title">5. Dificultad de la IA</h2>
                     <div class="selection-grid">
                         <label class="selection-card">
                             <input type="radio" name="difficulty" value="1" checked>
@@ -196,6 +237,7 @@
 
                 <div class="submit-bar">
                     <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">Buscar partida</button>
+                    <button type="button" class="btn btn-outline btn-lg" id="randomBtn" style="display:none;">🎲 Partida aleatoria</button>
                 </div>
 
             </form>
@@ -209,29 +251,43 @@
     <script>
         const aiDiffSection = document.getElementById('ai-difficulty-section');
 
-        // Mostrar/ocultar sección de dificultad según el modo seleccionado
+        // Mostrar/ocultar secciones y botones según el modo seleccionado
         document.querySelectorAll('input[name="mode"]').forEach(radio => {
             radio.addEventListener('change', () => {
                 const mode = radio.value;
-                const btn = document.getElementById('submitBtn');
-                btn.textContent = mode === 'online' ? 'Buscar partida' : 'Jugar ahora';
+                const submitBtn = document.getElementById('submitBtn');
+                const randomBtn = document.getElementById('randomBtn');
+                submitBtn.textContent = mode === 'online' ? 'Buscar partida' : 'Jugar ahora';
+                randomBtn.style.display = mode === 'online' ? '' : 'none';
                 aiDiffSection.style.display = mode === 'ai' ? 'block' : 'none';
             });
+        });
+
+        // Botón de partida aleatoria
+        document.getElementById('randomBtn').addEventListener('click', () => {
+            const form     = document.getElementById('gameMenuForm');
+            const goals    = form.querySelector('input[name="goals"]:checked')?.value ?? '5';
+            const time     = form.querySelector('input[name="time"]:checked')?.value  ?? '0';
+            const gameType = form.querySelector('input[name="gameType"]:checked')?.value ?? '2d';
+            const params   = new URLSearchParams({ mode: 'online', random: 'true', goals, time, gameType });
+            window.location.href = `/game/waiting?${params.toString()}`;
         });
 
         document.getElementById('gameMenuForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const form = e.target;
-            const mode = form.querySelector('input[name="mode"]:checked')?.value;
-            const map = form.querySelector('input[name="map"]:checked')?.value;
+            const mode     = form.querySelector('input[name="mode"]:checked')?.value;
+            const map      = form.querySelector('input[name="map"]:checked')?.value;
             const gameType = form.querySelector('input[name="gameType"]:checked')?.value;
+            const goals    = form.querySelector('input[name="goals"]:checked')?.value ?? '5';
+            const time     = form.querySelector('input[name="time"]:checked')?.value  ?? '0';
 
             if (!mode || !map || !gameType) {
                 Toast.error('Por favor selecciona todas las opciones.');
                 return;
             }
 
-            const params = new URLSearchParams({ mode, map, gameType });
+            const params = new URLSearchParams({ mode, map, gameType, goals, time });
 
             // Añadir dificultad si es modo IA
             if (mode === 'ai') {

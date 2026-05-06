@@ -7,6 +7,7 @@
     <title>TileKick — Juego 2D</title>
     <link rel="stylesheet" href="/styles/index.css">
     <link rel="stylesheet" href="/styles/protected/game/game.css">
+    <link rel="stylesheet" href="/styles/components/toast.css">
     <style>
         /* ── Badges de equipo ─────────────────────────────── */
         .my-piece-tag {
@@ -164,6 +165,13 @@
         </div>
     </div>
 
+    <!-- ── Banner de gol / atajada ────────────────────────── -->
+    <div id="game-banner">
+        <div class="banner-icon" id="banner-icon">⚽</div>
+        <div class="banner-text" id="banner-text">GOOOL!</div>
+        <div class="banner-sub"  id="banner-sub"></div>
+    </div>
+
     <div id="game-layout">
 
         <header id="game-hud">
@@ -191,6 +199,7 @@
             <div class="hud-block">
                 <span id="my-team-badge">⚽ Equipo —</span>
                 <p id="turn-indicator" class="hud-room">Turno: <span id="turn-team">A</span></p>
+                <p class="hud-room" id="hud-timer-wrap" style="display:none;">⏱ <span id="hud-timer">—</span></p>
                 <p class="hud-room">Sala <span id="room-id-display">—</span></p>
                 <a href="/game/menu" id="exit-btn">Salir</a>
             </div>
@@ -235,7 +244,7 @@
     <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
 
     <script type="module">
-        import { GameState, PHASES, GOAL_LIMIT } from '/engine/game.js';
+        import { GameState, PHASES } from '/engine/game.js';
         import { AIPlayer, AI_LEVELS } from '/engine/ai.js';
         import { Renderer2D } from '/js/game/renderer2d.js';
         import { AudioManager } from '/js/game/audio.js';
@@ -246,6 +255,8 @@
         const mapName    = params.get('map')         ?? 'estadio_clasico';
         const roomId     = params.get('room')        ?? null;
         const difficulty = parseInt(params.get('difficulty') ?? '2');
+        const goalLimit  = parseInt(params.get('goals') ?? '5') || 5;
+        const timeSecs   = parseInt(params.get('time')  ?? '0') || 0;
 
         // ── Usuario ───────────────────────────────────────────
         const me = await fetch('/api/me').then(r => r.json()).catch(() => ({}));
@@ -256,7 +267,7 @@
         const sfxVolume = prefs.sfx_volume ?? 80;
 
         // ── Estado del juego ──────────────────────────────────
-        const gs = new GameState({ mapName, mode });
+        const gs = new GameState({ mapName, mode, goalLimit, timeSecs });
 
         // ── AudioManager ──────────────────────────────────────
         const audio = new AudioManager(gs.board.theme, { sfxVolume });
@@ -324,6 +335,62 @@
             }
         }
 
+        // ── Temporizador de partida ───────────────────────────
+        let timerInterval = null;
+        let secondsLeft   = timeSecs;
+
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            if (timeSecs <= 0) return;    // sin límite
+            if (timerInterval !== null) return; // ya iniciado
+
+            const wrap    = document.getElementById('hud-timer-wrap');
+            const display = document.getElementById('hud-timer');
+            wrap.style.display = '';
+            display.textContent = formatTime(secondsLeft);
+
+            timerInterval = setInterval(() => {
+                if (gs.isOver()) { clearInterval(timerInterval); return; }
+                secondsLeft--;
+                display.textContent = formatTime(secondsLeft);
+
+                // Avisos visuales y toasts cuando queda poco tiempo
+                if (secondsLeft === 60) {
+                    Toast.warning('⏱ 1 minuto restante', { position: 'top-center', duration: 3000, title: '' });
+                } else if (secondsLeft === 30) {
+                    display.style.color = '#f87171';
+                    Toast.warning('⏱ ¡30 segundos!', { position: 'top-center', duration: 3000, title: '' });
+                } else if (secondsLeft === 10) {
+                    display.style.fontWeight = '800';
+                    Toast.error('⏱ ¡10 segundos!', { position: 'top-center', duration: 4000, title: '' });
+                }
+
+                if (secondsLeft <= 0) {
+                    clearInterval(timerInterval);
+                    // Determinar ganador por marcador; empate si igual
+                    const { score } = gs;
+                    let winner = null;
+                    if (score.A > score.B)      winner = 'A';
+                    else if (score.B > score.A) winner = 'B';
+                    // else winner = null → empate
+
+                    renderer.locked = true;
+                    showGameOver(winner, score, 'time');
+
+                    // Notificar al servidor también (solo online)
+                    if (mode === 'online' && socket && !gameOverReported) {
+                        gameOverReported = true;
+                        socket.emit('game-finished', { winnerTeam: winner });
+                    }
+                }
+            }, 1000);
+        }
+
         // ── Pantalla de fin de partida ────────────────────────
         let gameOverReported = false; // evitar doble envío a servidor
 
@@ -336,28 +403,33 @@
             const scoreEl  = document.getElementById('go-score');
             const detail   = document.getElementById('go-detail');
 
-            const isMyWin = (myTeam === null)
-                ? winner === 'A'
-                : winner === myTeam;
+            const isDraw  = (winner === null);
+            const isMyWin = !isDraw && (myTeam === null ? winner === 'A' : winner === myTeam);
 
-            if (myTeam === null) {
+            if (isDraw) {
+                trophy.textContent = '🤝';
+                title.textContent  = 'EMPATE';
+                title.className    = 'go-title draw';
+            } else if (myTeam === null) {
                 trophy.textContent = '🏆';
-                title.textContent = `¡Equipo ${winner} gana!`;
-                title.className = 'go-title win';
+                title.textContent  = `¡Equipo ${winner} gana!`;
+                title.className    = 'go-title win';
             } else if (isMyWin) {
                 trophy.textContent = '🏆';
-                title.textContent = reason === 'forfeit' ? '¡VICTORIA! (rival abandonó)' : '¡VICTORIA!';
-                title.className = 'go-title win';
+                title.textContent  = reason === 'forfeit' ? '¡VICTORIA! (rival abandonó)' : '¡VICTORIA!';
+                title.className    = 'go-title win';
             } else {
                 trophy.textContent = '😔';
-                title.textContent = 'DERROTA';
-                title.className = 'go-title lose';
+                title.textContent  = 'DERROTA';
+                title.className    = 'go-title lose';
             }
 
             scoreEl.textContent = `${score?.A ?? '—'} — ${score?.B ?? '—'}`;
             detail.textContent  = reason === 'forfeit'
                 ? 'El rival se desconectó'
-                : `Primero en llegar a ${GOAL_LIMIT} goles`;
+                : reason === 'time'
+                    ? 'Tiempo agotado'
+                    : `Primero en llegar a ${gs.goalLimit} goles`;
 
             overlay.classList.add('visible');
             window.gameResultData = { winner, score, username, mode };
@@ -367,6 +439,28 @@
                 gameOverReported = true;
                 socket.emit('game-finished', { winnerTeam: winner });
             }
+        }
+
+        // ── Banner animado (gol / atajada) ────────────────────
+        let _bannerTimer = null;
+
+        function showBanner(type, title, sub = '') {
+            const banner = document.getElementById('game-banner');
+            // Resetear animación limpiando clase y forzando reflow
+            banner.className = 'game-banner';
+            // eslint-disable-next-line no-unused-expressions
+            banner.offsetHeight;
+
+            document.getElementById('banner-icon').textContent = type === 'goal' ? '⚽' : '🧤';
+            document.getElementById('banner-text').textContent = title;
+            document.getElementById('banner-sub').textContent  = sub;
+
+            banner.classList.add(`banner-${type}`, 'banner-visible');
+
+            if (_bannerTimer) clearTimeout(_bannerTimer);
+            _bannerTimer = setTimeout(() => {
+                banner.classList.remove('banner-visible', `banner-${type}`);
+            }, 2700);
         }
 
         function shareResult(platform) {
@@ -396,13 +490,28 @@
                 updateHUD();
                 renderer.render();
 
-                // Sonidos según tipo de acción
+                // Sonidos + notificaciones según tipo de acción
                 if (result.interception) {
-                    result.interception.success ? audio.playStealSuccess() : audio.playStealFail();
+                    if (result.interception.success) {
+                        audio.playStealSuccess();
+                        Toast.success('⚡ ¡Robo exitoso!', { position: 'bottom-left', duration: 2200, title: '' });
+                    } else if (result.interception.protected) {
+                        audio.playIllegal();
+                        Toast.warning('🛡 El rival está protegido — no puedes robar de inmediato', { position: 'bottom-left', duration: 2500, title: '' });
+                    } else {
+                        audio.playStealFail();
+                        Toast.info('✋ Robo fallido — el rival conserva el balón', { position: 'bottom-left', duration: 1800, title: '' });
+                    }
                 } else if (result.goal) {
                     audio.playGoal();
+                    showBanner('goal', '¡GOOOL!',
+                        `Equipo ${result.scorer} · ${result.score?.A ?? gs.score.A}–${result.score?.B ?? gs.score.B}`);
                 } else if (result.saved) {
                     audio.playSave();
+                    showBanner('save', '¡ATAJADA!', 'El portero detiene el disparo');
+                } else if (result.pass) {
+                    audio.playPass();
+                    Toast.info(`⚽ ${result.event}`, { position: 'bottom-left', duration: 1400, title: '' });
                 } else {
                     audio.playMove();
                 }
@@ -439,8 +548,11 @@
                         addLog(`[IA] ${r.event}`);
                         if (r.goal) {
                             audio.playGoal();
+                            showBanner('goal', '¡GOOOL!',
+                                `Equipo ${r.scorer} · ${r.score?.A ?? gs.score.A}–${r.score?.B ?? gs.score.B}`);
                         } else if (r.saved) {
                             audio.playSave();
+                            showBanner('save', '¡ATAJADA!', 'El portero detuvo el disparo');
                         }
                         updateHUD();
                         renderer.render();
@@ -466,9 +578,16 @@
                         if (r.ok) {
                             addLog(`[IA] ${r.event}`);
                             if (r.interception) {
-                                r.interception.success ? audio.playStealSuccess() : audio.playStealFail();
+                                if (r.interception.success) {
+                                    audio.playStealSuccess();
+                                    Toast.warning('⚡ ¡La IA robó el balón!', { position: 'bottom-left', duration: 2200, title: '' });
+                                } else {
+                                    audio.playStealFail();
+                                }
                             } else if (r.goal) {
                                 audio.playGoal();
+                                showBanner('goal', '¡GOOOL!',
+                                    `Equipo ${r.scorer} · ${r.score?.A ?? gs.score.A}–${r.score?.B ?? gs.score.B}`);
                             } else {
                                 audio.playOpponentMove();
                             }
@@ -498,6 +617,7 @@
             updateHUD();
             renderer.render();
             audio.playGameStart();
+            startTimer();
         }
 
         if (mode === 'ai') {
@@ -509,6 +629,7 @@
             updateHUD();
             renderer.render();
             audio.playGameStart();
+            startTimer();
         }
 
         // ── Modo online: socket.io ────────────────────────────
@@ -544,6 +665,7 @@
                 } else {
                     addLog(`¡Partida lista! Eres el Equipo ${assignedTeam}`, 'success');
                     audio.playGameStart();
+                    startTimer();
                 }
 
                 updateHUD();
@@ -561,6 +683,7 @@
                     audio.playGameStart();
                     updateHUD();
                     renderer.render();
+                    startTimer();
                 }
             });
 
@@ -581,11 +704,19 @@
                 if (result?.ok) {
                     addLog(`[${fromTeam}] ${result.event}`, result.goal ? 'success' : 'info');
                     if (result.interception) {
-                        result.interception.success ? audio.playStealSuccess() : audio.playStealFail();
+                        if (result.interception.success) {
+                            audio.playStealSuccess();
+                            Toast.warning('⚡ ¡El rival robó el balón!', { position: 'bottom-left', duration: 2200, title: '' });
+                        } else {
+                            audio.playStealFail();
+                        }
                     } else if (result.goal) {
                         audio.playGoal();
+                        showBanner('goal', '¡GOOOL!',
+                            `Equipo ${result.scorer} · ${result.score?.A ?? gs.score.A}–${result.score?.B ?? gs.score.B}`);
                     } else if (result.saved) {
                         audio.playSave();
+                        showBanner('save', '¡ATAJADA!', 'El portero detuvo el disparo');
                     } else {
                         audio.playOpponentMove();
                     }
@@ -633,6 +764,7 @@
         }
     </script>
 
+    <script src="/js/components/toast.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </body>
 

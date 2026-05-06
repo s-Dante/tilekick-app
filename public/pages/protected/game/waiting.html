@@ -77,6 +77,15 @@
     const mode     = params.get('mode')     || 'online';
     const map      = params.get('map')      || '';
     const gameType = params.get('gameType') || '2d';
+    const goals    = params.get('goals')    || '5';
+    const time     = params.get('time')     || '0';
+    const random   = params.get('random')   === 'true';
+
+    // Actualizar UI según modo aleatorio o específico
+    if (random) {
+        document.querySelector('.waiting-header h1').textContent = 'Partida aleatoria';
+        document.querySelector('.waiting-header p').textContent  = 'Buscando cualquier oponente disponible...';
+    }
 
     const modeLabels = { online: 'Multijugador online', local: 'Multijugador local', ai: 'Contra la IA' };
     const mapLabels  = {
@@ -86,9 +95,9 @@
         aleatorio:       'Aleatorio',
     };
 
-    document.getElementById('info-mode').textContent     = modeLabels[mode]    || mode;
-    document.getElementById('info-map').textContent      = mapLabels[map]        || map;
-    document.getElementById('info-gameType').textContent = gameType.toUpperCase();
+    document.getElementById('info-mode').textContent     = random ? 'Aleatoria 🎲' : (modeLabels[mode] || mode);
+    document.getElementById('info-map').textContent      = random ? 'Cualquiera'   : (mapLabels[map]   || map);
+    document.getElementById('info-gameType').textContent = random ? 'Cualquiera'   : gameType.toUpperCase();
 
     // 3. Helpers de UI
     function addLog(icon, msg, type = 'info') {
@@ -127,8 +136,13 @@
             countdownEl.textContent = secs;
             if (secs <= 0) {
                 clearInterval(interval);
-                const dest = (data.gameType || gameType) === '3d' ? '/game/3d' : '/game/2d';
-                window.location.href = `${dest}?mode=online&map=${encodeURIComponent(map)}&room=${data.roomId}`;
+                // Usar siempre los parámetros que el servidor confirmó en match-found
+                const finalGameType = data.gameType  || gameType;
+                const finalMap      = data.map       || map || 'estadio_clasico';
+                const finalGoals    = data.goalLimit  ?? goals;
+                const finalTime     = data.timeSecs   ?? time;
+                const dest = finalGameType === '3d' ? '/game/3d' : '/game/2d';
+                window.location.href = `${dest}?mode=online&map=${encodeURIComponent(finalMap)}&room=${data.roomId}&goals=${finalGoals}&time=${finalTime}`;
             }
         }, 1000);
     }
@@ -138,11 +152,14 @@
 
     socket.on('connect', () => {
         addLog('🔌', `Conectado al servidor (${socket.id.slice(0, 8)})`);
-        socket.emit('join-waiting-room', { mode, map, gameType, username });
+        socket.emit('join-waiting-room', { mode, map, gameType, username, goals, time, random });
     });
 
     socket.on('waiting', () => {
-        addLog('🔍', 'Buscando oponente con la misma configuración...');
+        const msg = random
+            ? 'Buscando cualquier oponente disponible...'
+            : 'Buscando oponente con la misma configuración...';
+        addLog('🔍', msg);
     });
 
     socket.on('match-found', (data) => {

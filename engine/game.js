@@ -25,21 +25,25 @@ export const PHASES = {
 
 // ── Constantes de partida ────────────────────────────────────
 
-export const GOAL_LIMIT = 5;        // goles para ganar
-export const TURNS_TO_RESET = 30;   // turnos sin gol → resetear posiciones
+export const GOAL_LIMIT = 5;        // goles para ganar (valor por defecto)
+export const TURNS_TO_RESET = 100;   // turnos sin gol → resetear posiciones
 
 // ── Clase GameState ──────────────────────────────────────────
 
 export class GameState {
     /**
      * @param {object} opts
-     * @param {string} opts.mapName — clave de MAP_THEMES
-     * @param {string} opts.mode    — 'online' | 'local' | 'ai'
+     * @param {string} opts.mapName   — clave de MAP_THEMES
+     * @param {string} opts.mode      — 'online' | 'local' | 'ai'
+     * @param {number} opts.goalLimit — goles para ganar (por defecto GOAL_LIMIT=5)
+     * @param {number} opts.timeSecs  — segundos para la partida (0 = ilimitado)
      */
-    constructor({ mapName = 'estadio_clasico', mode = 'online' } = {}) {
+    constructor({ mapName = 'estadio_clasico', mode = 'online', goalLimit = GOAL_LIMIT, timeSecs = 0 } = {}) {
         this.board = new Board(mapName);
         this.pieces = buildInitialPieces();
         this.mode = mode;
+        this.goalLimit = goalLimit;
+        this.timeSecs = timeSecs;   // 0 = sin límite de tiempo
         this.turn = 'A';             // equipo que debe actuar
         this.phase = PHASES.MOVE;
         this.score = { A: 0, B: 0 };
@@ -195,7 +199,7 @@ export class GameState {
             this.turnsWithoutGoal = 0; // gol = reset del contador
 
             // Comprobar si alguien ganó
-            if (savedScore[scoringTeam] >= GOAL_LIMIT) {
+            if (savedScore[scoringTeam] >= this.goalLimit) {
                 this.phase = PHASES.OVER;
                 this.winner = scoringTeam;
                 return {
@@ -222,6 +226,7 @@ export class GameState {
     // ── Acciones privadas ────────────────────────────────────
 
     _doMove(piece, row, col) {
+        piece.stealProtected = false; // al moverse, pierde la protección
         const prevRow = piece.row;
         const prevCol = piece.col;
         piece.row = row;
@@ -243,6 +248,13 @@ export class GameState {
             return { ok: false, reason: 'No hay rival con balón en esa casilla' };
         }
 
+        // Protección anti-robo: no se puede robar recién tras un robo previo
+        if (targetPiece.stealProtected) {
+            this.lastEvent = `🛡 ${targetPiece.id} está protegido — no se puede robar de inmediato`;
+            this._endTurn();
+            return { ok: true, event: this.lastEvent, interception: { success: false, probability: 0, protected: true } };
+        }
+
         const result = resolveInterception(piece, targetPiece);
 
         // Si hay un resultado forzado (recibido via sync online), respetarlo.
@@ -254,7 +266,9 @@ export class GameState {
 
         if (result.success) {
             targetPiece.hasBall = false;
+            targetPiece.stealProtected = false; // ya no tiene el balón
             piece.hasBall = true;
+            piece.stealProtected = true;        // protección de 1 turno para quien acaba de robar
             this.lastEvent = `⚡ Robo exitoso (${result.probability}%) — ¡${piece.id} roba el balón a ${targetPiece.id}!`;
         } else {
             this.lastEvent = `✋ Robo fallido (${result.probability}%) — ${targetPiece.id} conserva el balón`;
@@ -264,6 +278,7 @@ export class GameState {
     }
 
     _doShoot(piece, goalRow, goalCol) {
+        piece.stealProtected = false; // disparar cancela la protección
         this.pendingShot = { shooterId: piece.id, targetRow: goalRow, targetCol: goalCol };
         this.lastEvent = `¡Disparo! ${piece.id} apunta a (${goalRow},${goalCol})`;
 
@@ -285,11 +300,12 @@ export class GameState {
         const target = this.getPiece(targetId);
         if (!target) return { ok: false, reason: 'Compañero no encontrado' };
 
+        piece.stealProtected = false; // pasar cancela la protección propia
         piece.hasBall = false;
         target.hasBall = true;
         this.lastEvent = `${piece.id} pasa el balón a ${target.id}`;
         this._endTurn();
-        return { ok: true, event: this.lastEvent };
+        return { ok: true, event: this.lastEvent, pass: true };
     }
 
     // ── Helpers internos ─────────────────────────────────────
@@ -314,11 +330,12 @@ export class GameState {
             this._resetPositions(savedScore);
             this.turnsWithoutGoal = 0;
             this.lastEvent = (this.lastEvent ? this.lastEvent + ' — ' : '') +
-                '⏱ ¡Reinicio! (30 turnos sin gol)';
+                `⏱ ¡Reinicio! (${TURNS_TO_RESET} turnos sin gol)`;
         }
     }
 
     _resetPositions(score) {
+        // buildInitialPieces() ya crea piezas sin protección (stealProtected=false por defecto).
         // Usamos board.reset() para conservar el tema/mapa visual;
         // crear new Board() con el string del tema causaría selección aleatoria de mapa.
         this.board.reset();
@@ -342,6 +359,8 @@ export class GameState {
             board: this.board.toJSON(),
             pieces: this.pieces.map(p => p.toJSON()),
             mode: this.mode,
+            goalLimit: this.goalLimit,
+            timeSecs: this.timeSecs,
             turn: this.turn,
             phase: this.phase,
             score: this.score,
@@ -356,7 +375,12 @@ export class GameState {
     }
 
     static fromJSON(data) {
-        const gs = new GameState({ mapName: data.board.theme, mode: data.mode });
+        const gs = new GameState({
+            mapName: data.board.theme,
+            mode: data.mode,
+            goalLimit: data.goalLimit ?? GOAL_LIMIT,
+            timeSecs: data.timeSecs ?? 0,
+        });
         gs.board = Board.fromJSON(data.board);
         gs.pieces = data.pieces.map(p => Piece.fromJSON(p));
         gs.turn = data.turn;

@@ -9,6 +9,7 @@
 // ============================================================
 
 import * as THREE from 'three';
+import { SceneBuilder3D } from './sceneBuilder3d.js';
 
 // ── Constantes de color ──────────────────────────────────────
 
@@ -72,11 +73,16 @@ export class Renderer3D {
         this.renderer = null;
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
+        this._clock  = new THREE.Clock();
 
-        // Mapas de meshes
+        // Mapas de meshes (modo 2.5D con cajas — se mantienen como fallback
+        // y para el raycasting de celdas mientras los modelos 3D se cargan)
         this.cellMeshes = new Map();  // `${row},${col}` → Mesh
         this.pieceMeshes = new Map(); // pieceId → Mesh
         this.highlights = [];
+
+        // SceneBuilder3D — responsable de cargar los modelos GLTF
+        this.sceneBuilder = null;
 
         // Orbit camera
         // Eje X del tablero: 0-4 → centro X = 2
@@ -98,6 +104,9 @@ export class Renderer3D {
         this._buildPieces();
         this._bindEvents();
         this._animate();
+
+        // Iniciar carga asíncrona del escenario 3D completo
+        this._buildScene3D();
     }
 
     // ── Inicialización de Three.js ────────────────────────────
@@ -122,7 +131,11 @@ export class Renderer3D {
         this.renderer.setSize(w, h);
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // Tone mapping necesario para que THREE.Sky luzca correcto
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 0.5;
         this.container.appendChild(this.renderer.domElement);
+
 
         // ── Iluminación estilizada ───────────────────────────
         // Luz hemisférica: simula cielo + suelo con tono cálido/frío
@@ -161,6 +174,41 @@ export class Renderer3D {
             cz + r * Math.cos(a)
         );
         this.camera.lookAt(cx, 0, cz);
+    }
+
+    // ── Escenario 3D (modelos GLTF) ───────────────────────────
+
+    /**
+     * Crea el SceneBuilder3D y lanza la carga asíncrona de modelos.
+     * Calidad: lee 'tilekick_quality' de localStorage ('low' | 'high').
+     * Después de la carga, oculta los fallbacks (cajas + cilindros).
+     */
+    async _buildScene3D() {
+        const theme   = this.gs.board.theme;
+        const quality = localStorage.getItem('tilekick_quality') ?? 'high';
+
+        this.sceneBuilder = new SceneBuilder3D(
+            this.scene,
+            theme,
+            this.gs.pieces,
+            this.gs.board,
+            this.renderer,   // necesario para Sky
+            this.camera,     // necesario para Sky
+            quality
+        );
+        try {
+            await this.sceneBuilder.build();
+
+            if (quality === 'high') {
+                // Ocultar cajas de tile (reemplazadas por GLTF tiles)
+                this.sceneBuilder.hideFallbackTiles(this.cellMeshes);
+
+                // Ocultar cilindros de pieza (reemplazados por personajes GLTF)
+                this.pieceMeshes.forEach(mesh => { mesh.visible = false; });
+            }
+        } catch (err) {
+            console.error('[Renderer3D] Error cargando escenario 3D:', err);
+        }
     }
 
     // ── Construcción del tablero ──────────────────────────────
@@ -247,7 +295,7 @@ export class Renderer3D {
             move:  0x0d9488,
             shoot: 0xef4444,
             pass:  0x6366f1,
-            steal: 0xf97316, // naranja
+            steal: 0xf97316,
         };
 
         for (const move of this.gs.legalMoves) {
@@ -273,10 +321,10 @@ export class Renderer3D {
         const board = this.gs.board;
         const palette = PALETTE[board.theme] ?? PALETTE.grass;
 
-        // Actualizar posiciones + estado de piezas
+        // Actualizar posiciones + estado de piezas (fallback cilindros)
         for (const piece of this.gs.pieces) {
             const mesh = this.pieceMeshes.get(piece.id);
-            if (!mesh) continue;
+            if (!mesh || !mesh.visible) continue;  // saltar si GLTF activo
 
             this._positionPiece(mesh, piece);
 
@@ -295,14 +343,16 @@ export class Renderer3D {
                 mesh.material.opacity = 1;
             }
 
-            // Indicador de balón
+            // Indicador de balón (fallback)
             const existing = mesh.children.find(c => c.userData.isBall);
             if (piece.hasBall && !existing) this._addBallIndicator(mesh);
             if (!piece.hasBall && existing) mesh.remove(existing);
         }
 
-        // Actualizar profundidades del tablero
+        // Actualizar profundidades del tablero (solo fallback cajas)
         for (const [key, mesh] of this.cellMeshes) {
+            if (!mesh.visible) continue;   // GLTF tiles activos → saltar
+
             const [row, col] = key.split(',').map(Number);
             const level = board.getLevel(row, col);
             const height = CELL_HEIGHTS[Math.min(level, 3)];
@@ -311,7 +361,6 @@ export class Renderer3D {
                 ? palette.goal
                 : (palette[`level${Math.min(level, 3)}`] ?? palette.level0)[(row + col) % 2];
 
-            // Redimensionar Y
             const baseH = CELL_HEIGHTS[0];
             mesh.scale.y = height / baseH;
             mesh.position.y = height / 2;
@@ -321,6 +370,12 @@ export class Renderer3D {
         // Resaltados
         if (this.gs.legalMoves.length > 0) this._showHighlights();
         else this._clearHighlights();
+
+        // Sincronizar modelos 3D con el estado del juego
+        if (this.sceneBuilder) {
+            this.sceneBuilder.syncCharacters(this.gs.pieces);
+            this.sceneBuilder.syncTiles(this.gs.board);
+        }
     }
 
     // ── Interacción: órbita + click ───────────────────────────
@@ -380,8 +435,14 @@ export class Renderer3D {
         }
 
         // 2. Click en pieza → seleccionar
-        const pieceMeshes = [...this.pieceMeshes.values()];
-        const pieceHits = this.raycaster.intersectObjects(pieceMeshes, true);
+        // Incluimos tanto las cajas 2.5D (pieceMeshes) como los modelos 3D (sceneBuilder)
+        const pieceMeshList = [...this.pieceMeshes.values()];
+        const char3DMeshes  = this.sceneBuilder
+            ? [...this.sceneBuilder.characterMeshes.values()]
+            : [];
+        const allPieceMeshes = [...pieceMeshList, ...char3DMeshes];
+
+        const pieceHits = this.raycaster.intersectObjects(allPieceMeshes, true);
         if (pieceHits.length > 0) {
             let obj = pieceHits[0].object;
             while (obj && !obj.userData.pieceId) obj = obj.parent;
@@ -444,6 +505,9 @@ export class Renderer3D {
 
     _animate() {
         requestAnimationFrame(() => this._animate());
+        const delta = this._clock.getDelta();
+        // Animar agua si está activa
+        if (this.sceneBuilder) this.sceneBuilder.tickWater(delta);
         this.renderer.render(this.scene, this.camera);
     }
 

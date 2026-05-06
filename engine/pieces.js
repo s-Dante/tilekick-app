@@ -34,13 +34,16 @@ export const PIECE_STATS = {
  *  - hasBall: true si esta pieza posee el balón
  */
 export class Piece {
-    constructor({ id, type, team, row, col, hasBall = false }) {
+    constructor({ id, type, team, row, col, hasBall = false, stealProtected = false }) {
         this.id = id;
         this.type = type;
         this.team = team;
         this.row = row;
         this.col = col;
         this.hasBall = hasBall;
+        // Protección anti-robo: activa durante 1 turno tras recibir el balón por robo.
+        // Mientras esté activa, ningún rival puede robar el balón a esta pieza.
+        this.stealProtected = stealProtected;
     }
 
     /** Stats derivados del tipo */
@@ -61,6 +64,7 @@ export class Piece {
             row: this.row,
             col: this.col,
             hasBall: this.hasBall,
+            stealProtected: this.stealProtected,
         };
     }
 

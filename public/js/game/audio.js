@@ -51,6 +51,7 @@ export class AudioManager {
         this._cache = {};
         this._lastMovementIdx = -1;
         this._enabled = true;
+        this._ambientAudio = null;
         this._preload();
     }
 
@@ -104,6 +105,15 @@ export class AudioManager {
     /** Pase del balón */
     playPass() { this._playMovement(); }
 
+    /** Patada / chut al balón (FX dedicado) */
+    playKick() {
+        // Intenta el sonido dedicado de FX; si no existe, usa movimiento genérico
+        const src = `/assets/ChessSFX/FX/kick.mp3`;
+        const audio = new Audio(src);
+        audio.volume = this.sfxVolume;
+        audio.play().catch(() => this._playMovement()); // fallback si el archivo no existe
+    }
+
     /** Robo de balón exitoso */
     playStealSuccess() { this._play(DEDICATED.steal_success); }
 
@@ -125,14 +135,47 @@ export class AudioManager {
     /** Acción ilegal */
     playIllegal() { this._play(DEDICATED.illegal); }
 
+    // ── Audio ambiente ───────────────────────────────────────
+
+    /**
+     * Inicia un sonido de ambiente en loop (crowd, wind, beach…)
+     * Los archivos deben estar en /assets/ChessSFX/Ambient/
+     * @param {string} track — nombre del archivo sin extensión
+     * @param {number} volume — factor de volumen 0-1 relativo al sfxVolume (default 0.35)
+     */
+    playAmbient(track = 'crowd', volume = 0.35) {
+        if (!this._enabled) return;
+        this.stopAmbient(); // detener el anterior si lo había
+        const audio = new Audio(`/assets/ChessSFX/Ambient/${track}.mp3`);
+        audio.loop   = true;
+        audio.volume = Math.min(1, this.sfxVolume * volume);
+        audio.play().catch(() => {}); // silencioso si el archivo no existe
+        this._ambientAudio = audio;
+    }
+
+    /**
+     * Detiene el audio de ambiente en curso.
+     */
+    stopAmbient() {
+        if (this._ambientAudio) {
+            this._ambientAudio.pause();
+            this._ambientAudio.currentTime = 0;
+            this._ambientAudio = null;
+        }
+    }
+
     // ── Configuración ────────────────────────────────────────
 
     setVolume(sfxVolume) {
         this.sfxVolume = Math.max(0, Math.min(1, sfxVolume / 100));
+        if (this._ambientAudio) {
+            this._ambientAudio.volume = Math.min(1, this.sfxVolume * 0.35);
+        }
     }
 
     setEnabled(enabled) {
         this._enabled = enabled;
+        if (!enabled) this.stopAmbient();
     }
 
     /**
