@@ -261,6 +261,289 @@ app.get('/recovery', (req, res) => {
     res.sendFile(pages.recovery);
 });
 
+// ============================================================
+//  OAuth 2.0 — Google, Facebook, GitHub
+//  Flujo manual sin passport: redirect → callback → JWT → dashboard
+//  provider codes: 1=google  2=facebook  3=github
+// ============================================================
+
+const OAUTH_PROVIDERS = { GOOGLE: 1, FACEBOOK: 2, GITHUB: 3 };
+
+/**
+ * Busca o crea un usuario a partir de datos OAuth.
+ * Si existe social_account → reutiliza user.
+ * Si no pero hay email → vincula a user existente con ese correo.
+ * Si nada → crea user nuevo.
+ * Emite JWT httpOnly y redirige al dashboard.
+ */
+function oauthFinish(provider, providerUserId, profile, res) {
+    const { name, email, avatarUrl } = profile;
+    const now = new Date();
+
+    // 1. ¿Ya hay cuenta social vinculada?
+    db.query(
+        'SELECT user_id FROM social_accounts WHERE provider = ? AND provider_user_id = ?',
+        [provider, String(providerUserId)],
+        (err, rows) => {
+            if (err) {
+                console.error('[OAuth] DB error (lookup):', err);
+                return res.redirect('/login?error=server');
+            }
+
+            if (rows.length > 0) {
+                return _issueJwt(rows[0].user_id, res);
+            }
+
+            // 2. ¿Existe usuario con el mismo email?
+            if (email) {
+                db.query('SELECT id FROM users WHERE email = ?', [email], (err2, users) => {
+                    if (err2) {
+                        console.error('[OAuth] DB error (email lookup):', err2);
+                        return res.redirect('/login?error=server');
+                    }
+
+                    if (users.length > 0) {
+                        const userId = users[0].id;
+                        db.query(
+                            'INSERT IGNORE INTO social_accounts (user_id, provider, provider_user_id) VALUES (?, ?, ?)',
+                            [userId, provider, String(providerUserId)],
+                            () => _issueJwt(userId, res)
+                        );
+                    } else {
+                        _createOAuthUser({ name, email, avatarUrl, now }, provider, String(providerUserId), res);
+                    }
+                });
+            } else {
+                _createOAuthUser({ name, email: null, avatarUrl, now }, provider, String(providerUserId), res);
+            }
+        }
+    );
+}
+
+function _createOAuthUser({ name, email, avatarUrl, now }, provider, providerUserId, res) {
+    // Si el proveedor no entrega email (ej. GitHub con email privado),
+    // usamos un placeholder con formato noreply para cumplir el NOT NULL de la BD.
+    const effectiveEmail = email || `oauth_${provider}_${providerUserId}@noreply.tilekick.local`;
+
+    const sql  = 'INSERT INTO users (name, email, avatar_url, is_verified, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)';
+    const vals = [name || 'Player', effectiveEmail, avatarUrl || null, now, now];
+
+    db.query(sql, vals, (err, result) => {
+        if (err) {
+            console.error('[OAuth] DB error (insert user):', err);
+            return res.redirect('/login?error=server');
+        }
+        const userId = result.insertId;
+        db.query(
+            'INSERT IGNORE INTO social_accounts (user_id, provider, provider_user_id) VALUES (?, ?, ?)',
+            [userId, provider, providerUserId]
+        );
+        db.query('INSERT IGNORE INTO user_achievements (user_id) VALUES (?)', [userId]);
+        db.query('INSERT IGNORE INTO user_preferences (user_id) VALUES (?)', [userId]);
+        _issueJwt(userId, res);
+    });
+}
+
+function _issueJwt(userId, res) {
+    db.query('SELECT id, username, email, name FROM users WHERE id = ?', [userId], (err, rows) => {
+        if (err || !rows.length) {
+            console.error('[OAuth] _issueJwt error:', err);
+            return res.redirect('/login?error=server');
+        }
+        const user  = rows[0];
+        const token = jwt.sign(
+            { id: user.id, username: user.username, email: user.email, name: user.name },
+            process.env.TOKEN_SECRET,
+            { expiresIn: '1h' }
+        );
+        res.cookie('auth_token', token, {
+            httpOnly: true,
+            maxAge: 60 * 60 * 1000,
+            sameSite: 'lax',   // lax = necesario para redirects cross-site OAuth
+        });
+        res.redirect('/dashboard');
+    });
+}
+
+// ── Google ────────────────────────────────────────────────────
+
+app.get('/auth/google', (req, res) => {
+    if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'your_google_client_id_here') {
+        return res.redirect('/login?error=oauth_not_configured');
+    }
+    const params = new URLSearchParams({
+        client_id:     process.env.GOOGLE_CLIENT_ID,
+        redirect_uri:  `${process.env.APP_URL}/auth/google/callback`,
+        response_type: 'code',
+        scope:         'openid email profile',
+        access_type:   'online',
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.redirect('/login?error=oauth_denied');
+
+    try {
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body:    new URLSearchParams({
+                code,
+                client_id:     process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                redirect_uri:  `${process.env.APP_URL}/auth/google/callback`,
+                grant_type:    'authorization_code',
+            }),
+        });
+        const tokenData = await tokenRes.json();
+        if (tokenData.error) {
+            console.error('[OAuth Google] token error:', tokenData.error);
+            return res.redirect('/login?error=oauth_failed');
+        }
+
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        const profile = await userRes.json();
+
+        oauthFinish(OAUTH_PROVIDERS.GOOGLE, profile.id, {
+            name:      profile.name,
+            email:     profile.email,
+            avatarUrl: profile.picture,
+        }, res);
+    } catch (e) {
+        console.error('[OAuth Google] callback error:', e);
+        res.redirect('/login?error=oauth_failed');
+    }
+});
+
+// ── Facebook ──────────────────────────────────────────────────
+
+app.get('/auth/facebook', (req, res) => {
+    if (!process.env.FACEBOOK_APP_ID || process.env.FACEBOOK_APP_ID === 'your_facebook_app_id_here') {
+        return res.redirect('/login?error=oauth_not_configured');
+    }
+    const params = new URLSearchParams({
+        client_id:     process.env.FACEBOOK_APP_ID,
+        redirect_uri:  `${process.env.APP_URL}/auth/facebook/callback`,
+        scope:         'email,public_profile',
+        response_type: 'code',
+    });
+    res.redirect(`https://www.facebook.com/v19.0/dialog/oauth?${params}`);
+});
+
+app.get('/auth/facebook/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.redirect('/login?error=oauth_denied');
+
+    try {
+        const tokenRes = await fetch(
+            `https://graph.facebook.com/v19.0/oauth/access_token?` +
+            new URLSearchParams({
+                client_id:     process.env.FACEBOOK_APP_ID,
+                client_secret: process.env.FACEBOOK_APP_SECRET,
+                redirect_uri:  `${process.env.APP_URL}/auth/facebook/callback`,
+                code,
+            })
+        );
+        const tokenData = await tokenRes.json();
+        if (tokenData.error) {
+            console.error('[OAuth Facebook] token error:', tokenData.error);
+            return res.redirect('/login?error=oauth_failed');
+        }
+
+        const userRes = await fetch(
+            `https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${tokenData.access_token}`
+        );
+        const profile = await userRes.json();
+
+        oauthFinish(OAUTH_PROVIDERS.FACEBOOK, profile.id, {
+            name:      profile.name,
+            email:     profile.email || null,
+            avatarUrl: profile.picture?.data?.url || null,
+        }, res);
+    } catch (e) {
+        console.error('[OAuth Facebook] callback error:', e);
+        res.redirect('/login?error=oauth_failed');
+    }
+});
+
+// ── GitHub ────────────────────────────────────────────────────
+
+app.get('/auth/github', (req, res) => {
+    if (!process.env.GITHUB_CLIENT_ID || process.env.GITHUB_CLIENT_ID === 'your_github_client_id_here') {
+        return res.redirect('/login?error=oauth_not_configured');
+    }
+    const params = new URLSearchParams({
+        client_id:    process.env.GITHUB_CLIENT_ID,
+        redirect_uri: `${process.env.APP_URL}/auth/github/callback`,
+        scope:        'read:user user:email',
+    });
+    res.redirect(`https://github.com/login/oauth/authorize?${params}`);
+});
+
+app.get('/auth/github/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.redirect('/login?error=oauth_denied');
+
+    try {
+        const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept':       'application/json',
+            },
+            body: new URLSearchParams({
+                client_id:     process.env.GITHUB_CLIENT_ID,
+                client_secret: process.env.GITHUB_CLIENT_SECRET,
+                code,
+                redirect_uri:  `${process.env.APP_URL}/auth/github/callback`,
+            }),
+        });
+        const tokenData = await tokenRes.json();
+        if (tokenData.error) {
+            console.error('[OAuth GitHub] token error:', tokenData.error);
+            return res.redirect('/login?error=oauth_failed');
+        }
+
+        const [userRes, emailsRes] = await Promise.all([
+            fetch('https://api.github.com/user', {
+                headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'TileKick' },
+            }),
+            fetch('https://api.github.com/user/emails', {
+                headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'TileKick' },
+            }),
+        ]);
+        const profile = await userRes.json();
+        const emails  = await emailsRes.json();
+
+        let email = profile.email;
+        if (!email && Array.isArray(emails)) {
+            const primary = emails.find(e => e.primary && e.verified);
+            email = primary?.email ?? null;
+        }
+
+        oauthFinish(OAUTH_PROVIDERS.GITHUB, String(profile.id), {
+            name:      profile.name || profile.login,
+            email,
+            avatarUrl: profile.avatar_url || null,
+        }, res);
+    } catch (e) {
+        console.error('[OAuth GitHub] callback error:', e);
+        res.redirect('/login?error=oauth_failed');
+    }
+});
+
+// ── Config pública (App IDs, safe para el frontend) ───────────
+
+app.get('/api/config/public', (req, res) => {
+    res.json({
+        facebookAppId: process.env.FACEBOOK_APP_ID || '',
+    });
+});
+
 /**
  * API — Recovery de contraseña
  *
@@ -428,6 +711,63 @@ app.post('/api/recovery/reset', async (req, res) => {
         console.log(`[Recovery] Contraseña actualizada para userId ${session.userId}`);
         res.json({ ok: true, message: 'Contraseña actualizada exitosamente.' });
     });
+});
+
+/**
+ * GET /share — Página pública con Open Graph dinámico para compartir resultados.
+ * Facebook y Twitter scrapean esta URL y muestran la imagen correcta en el preview.
+ *
+ * Query params:
+ *   result  = win | lose | draw
+ *   score   = "3-1"   (goles A-B)
+ *   map     = nombre del mapa (opcional)
+ */
+app.get('/share', (req, res) => {
+    const result = ['win', 'lose', 'draw'].includes(req.query.result) ? req.query.result : 'win';
+    const score  = /^\d+-\d+$/.test(req.query.score ?? '') ? req.query.score : '3–1';
+    const map    = req.query.map || 'TileKick';
+
+    const appUrl  = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const imgPath = `/assets/img/share/${result}.png`;
+    const imgUrl  = `${appUrl}${imgPath}`;
+
+    const titles  = { win: '¡VICTORIA! 🏆', lose: '¡DERROTA! 😔', draw: '¡EMPATE! 🤝' };
+    const title   = titles[result];
+    const desc    = `Resultado: ${score} · ${map} · ¿Me retas a TileKick? 🎮⚽`;
+    const gameUrl = `${appUrl}/`;
+
+    // Devuelve HTML minimalista con las meta OG correctas y redirige al inicio.
+    // Los bots (Facebook, Twitter) solo leen las metas; el usuario ve la redirección.
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${title} — TileKick</title>
+
+  <!-- Open Graph (Facebook, WhatsApp, LinkedIn…) -->
+  <meta property="og:type"        content="website">
+  <meta property="og:site_name"   content="TileKick">
+  <meta property="og:url"         content="${appUrl}/share?result=${result}&score=${encodeURIComponent(score)}&map=${encodeURIComponent(map)}">
+  <meta property="og:title"       content="${title} — TileKick">
+  <meta property="og:description" content="${desc}">
+  <meta property="og:image"       content="${imgUrl}">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="${title} — TileKick">
+  <meta name="twitter:description" content="${desc}">
+  <meta name="twitter:image"       content="${imgUrl}">
+
+  <!-- Redirigir al home si es un usuario real (los bots no ejecutan JS) -->
+  <script>window.location.replace('${gameUrl}');</script>
+</head>
+<body>
+  <p><a href="${gameUrl}">Ir a TileKick</a></p>
+</body>
+</html>`);
 });
 
 /**

@@ -323,9 +323,10 @@ export class SceneBuilder3D {
         // El plano de Water está en XY por defecto → rotar para que quede en XZ
         water.rotation.x = -Math.PI / 2;
         // Centrar en el tablero: X centro = (BOARD_COLS-1)/2 = 2, Z centro = (BOARD_ROWS-1)/2 = 4.5
-        water.position.set(2, cfg.posY, 4.5);
+        water.position.set(2, cfg.posY, -10);
+        water.scale.set(15, 15, 1);
         water.name = 'WaterPlane';
-
+ 
         this.scene.add(water);
         this.waterMesh = water;
     }
@@ -496,10 +497,10 @@ export class SceneBuilder3D {
         // ── AJUSTE: Personajes ─────────────────────────────────
         obj.position.set(
             piece.col * CELL_SIZE,
-            0,                       // Y ← sube si queda hundido en el tile
+            0.5,                       // Y ← sube si queda hundido en el tile
             piece.row * CELL_SIZE
         );
-        obj.scale.set(1, 1, 1);      // ← ESCALA del personaje
+        obj.scale.set(0.7, 0.7, 0.7);      // ← ESCALA del personaje
         obj.rotation.set(0, piece.team === 'B' ? Math.PI : 0, 0);
         // ──────────────────────────────────────────────────────
     }
@@ -518,8 +519,8 @@ export class SceneBuilder3D {
             obj.traverse(c => { if (c.isMesh) { c.castShadow = c.receiveShadow = true; } });
 
             // ── AJUSTE: Pelota ─────────────────────────────────
-            obj.position.set(0, 0.25, 0.1);  // offset LOCAL al personaje portador
-            obj.scale.set(0.5, 0.5, 0.5);    // ← ESCALA de la pelota
+            obj.position.set(0, 0.5, 0.5);  // offset LOCAL al personaje portador
+            obj.scale.set(0.2, 0.2, 0.2);    // ← ESCALA de la pelota
             // ──────────────────────────────────────────────────
 
             this.ballObject = obj;

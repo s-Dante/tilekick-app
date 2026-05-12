@@ -5,6 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TileKick — Juego 2D</title>
+    <!-- Open Graph — imagen para compartir en redes sociales -->
+    <!-- Coloca tus imágenes en /assets/img/share/win.png y lose.png (1200×630 px recomendado) -->
+    <meta id="og-image" property="og:image" content="/assets/img/share/win.png">
+    <meta property="og:title"       content="¡Jugué TileKick! 🎮⚽">
+    <meta property="og:description" content="TileKick — el ajedrez del fútbol. ¿Me retas?">
+    <meta property="og:type"        content="website">
     <link rel="stylesheet" href="/styles/index.css">
     <link rel="stylesheet" href="/styles/protected/game/game.css">
     <link rel="stylesheet" href="/styles/components/toast.css">
@@ -98,6 +104,9 @@
             margin-bottom: 20px;
         }
         .go-share-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             padding: 8px 16px;
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.12);
@@ -106,9 +115,10 @@
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.15s;
+            transition: background 0.15s, transform 0.1s;
         }
-        .go-share-btn:hover { background: rgba(255,255,255,0.12); }
+        .go-share-btn:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+        .go-share-btn:active { transform: translateY(0); }
         .go-actions {
             display: flex;
             gap: 12px;
@@ -154,9 +164,18 @@
                 </div>
             </div>
             <div class="go-share">
-                <button class="go-share-btn" onclick="shareResult('facebook')">📘 Facebook</button>
-                <button class="go-share-btn" onclick="shareResult('github')">🐙 GitHub</button>
-                <button class="go-share-btn" onclick="shareResult('google')">🔍 Google</button>
+                <button class="go-share-btn go-share-fb" id="goShareFb" onclick="shareResult('facebook')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="#1877F2" d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.696 4.533-4.696 1.312 0 2.686.236 2.686.236v2.97H15.83c-1.491 0-1.956.93-1.956 1.886v2.255h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+                    Compartir
+                </button>
+                <button class="go-share-btn" onclick="shareResult('twitter')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.629 5.905-5.629zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Tuitear
+                </button>
+                <button class="go-share-btn" onclick="shareResult('copy')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    Copiar
+                </button>
             </div>
             <div class="go-actions">
                 <a href="/game/menu" class="btn btn-primary">Jugar de nuevo</a>
@@ -432,7 +451,17 @@
                     : `Primero en llegar a ${gs.goalLimit} goles`;
 
             overlay.classList.add('visible');
-            window.gameResultData = { winner, score, username, mode };
+            window.gameResultData = { winner, score, username, mode, isMyWin, isDraw };
+
+            // Cambiar OG image según resultado (para el share en redes)
+            const ogImg = document.getElementById('og-image');
+            if (ogImg) {
+                ogImg.content = isDraw
+                    ? '/assets/img/share/draw.png'
+                    : isMyWin
+                        ? '/assets/img/share/win.png'
+                        : '/assets/img/share/lose.png';
+            }
 
             // Notificar al servidor para guardar resultado (solo online, solo una vez)
             if (mode === 'online' && socket && !gameOverReported) {
@@ -463,15 +492,73 @@
             }, 2700);
         }
 
+        // ── Facebook SDK ──────────────────────────────────────
+        // Se inicializa de forma asíncrona con el App ID del servidor
+        let _fbReady = false;
+        fetch('/api/config/public')
+            .then(r => r.json())
+            .then(({ facebookAppId }) => {
+                if (!facebookAppId) return;
+                window.fbAsyncInit = function () {
+                    FB.init({ appId: facebookAppId, xfbml: false, version: 'v19.0' });
+                    _fbReady = true;
+                };
+                const s = document.createElement('script');
+                s.src   = 'https://connect.facebook.net/es_LA/sdk.js';
+                s.async = true;
+                s.defer = true;
+                document.head.appendChild(s);
+            })
+            .catch(() => {}); // graceful fallback si no hay config
+
         function shareResult(platform) {
-            const d = window.gameResultData ?? {};
-            const text = `¡Acabo de jugar TileKick! Resultado: ${d.score?.A ?? 0} — ${d.score?.B ?? 0}. ¿Me retas? 🎮⚽`;
-            const urls = {
-                facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(location.origin)}&quote=${encodeURIComponent(text)}`,
-                github:   `https://github.com/`,
-                google:   `https://plus.google.com/share?url=${encodeURIComponent(location.origin)}`,
-            };
-            window.open(urls[platform], '_blank', 'width=600,height=400');
+            const d      = window.gameResultData ?? {};
+            const result = d.isDraw ? 'draw' : d.isMyWin ? 'win' : 'lose';
+            const scoreA = d.score?.A ?? 0;
+            const scoreB = d.score?.B ?? 0;
+            const score  = `${scoreA}-${scoreB}`;
+
+            // URL de la página /share con OG tags dinámicos — Facebook y Twitter
+            // scrapearan esta URL y mostraran la imagen correcta en la vista previa.
+            const sharePageUrl = `${location.origin}/share?result=${result}&score=${encodeURIComponent(score)}&map=${encodeURIComponent(params.get('map') || 'TileKick')}`;
+            const text = `¡Acabo de jugar TileKick! ${result === 'win' ? '🏆 ¡Gané' : result === 'lose' ? '😔 Perdí' : '🤝 Empaté'} ${scoreA}–${scoreB}. ¿Me retas? 🎮⚽`;
+
+            if (platform === 'facebook') {
+                if (_fbReady && typeof FB !== 'undefined') {
+                    FB.ui({
+                        method:  'share',
+                        href:    sharePageUrl,
+                        hashtag: '#TileKick',
+                    }, () => {});
+                } else {
+                    window.open(
+                        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePageUrl)}`,
+                        '_blank', 'width=600,height=500'
+                    );
+                }
+                return;
+            }
+
+            if (platform === 'twitter') {
+                // Web intent incluye la sharePageUrl para que Twitter muestre la Twitter Card con imagen
+                window.open(
+                    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(sharePageUrl)}&hashtags=TileKick`,
+                    '_blank', 'width=600,height=420'
+                );
+                return;
+            }
+
+            if (platform === 'copy') {
+                navigator.clipboard?.writeText(`${text} ${sharePageUrl}`).then(() => {
+                    const btn = document.querySelector('.go-share-btn:last-child');
+                    if (btn) {
+                        const orig = btn.innerHTML;
+                        btn.textContent = '✓ Copiado';
+                        setTimeout(() => { btn.innerHTML = orig; }, 2000);
+                    }
+                }).catch(() => {});
+                return;
+            }
         }
         window.shareResult = shareResult;
 
@@ -516,16 +603,18 @@
                     audio.playMove();
                 }
 
+                // ── Modo online: enviar acción al servidor ────
+                // IMPORTANTE: emitir ANTES de showGameOver para que el rival
+                // reciba el último movimiento y también muestre su pantalla de fin.
+                if (mode === 'online' && socket && result._sync) {
+                    socket.emit('game-action', result._sync);
+                }
+
                 // Pantalla de fin si gameOver
                 if (result.gameOver) {
                     renderer.locked = true;
                     showGameOver(result.winner, result.score);
                     return;
-                }
-
-                // ── Modo online: enviar acción al servidor ────
-                if (mode === 'online' && socket && result._sync) {
-                    socket.emit('game-action', result._sync);
                 }
 
                 // ── Modo IA: ceder el turno si corresponde ────

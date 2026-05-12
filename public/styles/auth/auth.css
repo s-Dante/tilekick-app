@@ -397,3 +397,71 @@
   padding: var(--sp-1) var(--sp-3);
   font-size: var(--text-xs);
 }
+
+/* --- Botón "volver" — flotante fuera del card, esquina superior izquierda --- */
+.auth-back-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
+}
+.auth-back-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--primary);
+}
+.auth-back-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* --- Social login buttons — fila compacta de 3 iconos --- */
+.social-btns {
+  display: flex;
+  flex-direction: row;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  justify-content: center;
+}
+
+.btn-social {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-3);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border-2);
+  background: var(--surface-2);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), transform 0.1s ease;
+}
+.btn-social:hover {
+  background: var(--surface-3);
+  border-color: var(--border);
+  transform: translateY(-2px);
+}
+.btn-social:active {
+  transform: translateY(0);
+}
+.btn-social svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: block;
+}
