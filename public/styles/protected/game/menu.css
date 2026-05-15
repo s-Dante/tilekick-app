@@ -225,6 +225,38 @@
   border-radius: var(--radius-xl);
 }
 
+/* --- Desktop-only badge (3D bloqueado en móvil) --- */
+.desktop-only-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(251, 146, 60, 0.15);
+  border: 1px solid rgba(251, 146, 60, 0.4);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fb923c;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.selection-card.disabled-mobile {
+  pointer-events: none;
+}
+
+.selection-card.disabled-mobile .card-content {
+  opacity: 0.45;
+  filter: grayscale(0.5);
+}
+
+.selection-card.disabled-mobile:hover .card-content {
+  transform: none;
+  border-color: var(--border);
+  background: var(--surface);
+}
+
 @media (max-width: 768px) {
 
   #content {

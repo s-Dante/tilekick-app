@@ -12,15 +12,40 @@
 // ── Constantes de color ──────────────────────────────────────
 
 const TEAM_COLORS = {
-    A: { fill: '#0d9488', stroke: '#14b8a6', text: '#f0efe9', ball: '#fbbf24' },
-    B: { fill: '#65713a', stroke: '#7e8e48', text: '#f0efe9', ball: '#fbbf24' },
+    A: {
+        fill:     '#0d9488',
+        stroke:   '#14b8a6',
+        text:     '#f0efe9',
+        darkFill: '#053d38',    // relleno oscuro para piezas rivales
+        glow:     'rgba(13, 148, 136, 0.22)',  // halo piezas propias
+    },
+    B: {
+        fill:     '#65713a',
+        stroke:   '#7e8e48',
+        text:     '#f0efe9',
+        darkFill: '#2a2f17',
+        glow:     'rgba(101, 113, 58, 0.22)',
+    },
+};
+
+// Fondo del canvas según tema del mapa
+const THEME_BG = {
+    grass:  '#071a0c',   // verde oscuro profundo
+    sand:   '#1a1005',   // marrón cálido oscuro
+    cement: '#0c0e14',   // azul gris oscuro
+};
+
+// Color del halo de "tu zona" en el lado inferior del tablero
+const THEME_ZONE = {
+    A: 'rgba(13, 148, 136, 0.10)',   // teal suave
+    B: 'rgba(101, 113, 58, 0.10)',   // olive suave
 };
 
 const ACTION_COLORS = {
     move:  { overlay: 'rgba(13, 148, 136, 0.35)',  dot: '#0d9488' },
     shoot: { overlay: 'rgba(239, 68, 68, 0.35)',   dot: '#ef4444' },
     pass:  { overlay: 'rgba(99, 102, 241, 0.35)',  dot: '#6366f1' },
-    steal: { overlay: 'rgba(251, 146, 60, 0.45)',  dot: '#f97316' }, // naranja — robo
+    steal: { overlay: 'rgba(251, 146, 60, 0.45)',  dot: '#f97316' },
 };
 
 export class Renderer2D {
@@ -100,14 +125,54 @@ export class Renderer2D {
         const { ctx } = this;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Fondo
-        ctx.fillStyle = '#0a0e15';
+        // Fondo theme-aware
+        const theme = this.gs.board?.theme ?? 'grass';
+        ctx.fillStyle = THEME_BG[theme] ?? THEME_BG.grass;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this._drawBoard();
+        this._drawYourZone();   // halo de territorio propio
         this._drawHighlights();
         this._drawPieces();
         if (this.dragging) this._drawDragPiece();
+    }
+
+    // ── Tu zona (gradiente de territorio) ────────────────────
+    //
+    // En modos online/IA muestra un suave gradiente en la mitad
+    // inferior del tablero (donde siempre están tus piezas)
+    // para marcar visualmente tu territorio.
+
+    _drawYourZone() {
+        if (this.myTeam === null) return; // local: no aplica
+
+        const { ctx, cellSize, offsetX, offsetY } = this;
+        const boardH = cellSize * 10;
+        const boardW = cellSize * 5;
+        const zoneH  = cellSize * 3.5; // últimas 3.5 filas = tu zona
+
+        // Siempre en la parte INFERIOR del canvas (las piezas propias siempre abajo)
+        const grd = ctx.createLinearGradient(
+            0, offsetY + boardH - zoneH,
+            0, offsetY + boardH
+        );
+        const zoneColor = THEME_ZONE[this.myTeam] ?? THEME_ZONE.A;
+        grd.addColorStop(0, 'transparent');
+        grd.addColorStop(1, zoneColor);
+
+        ctx.fillStyle = grd;
+        ctx.fillRect(offsetX, offsetY + boardH - zoneH, boardW, zoneH);
+
+        // Línea de mediocampo — separador visual entre zonas
+        const midY = offsetY + cellSize * 5;
+        ctx.beginPath();
+        ctx.moveTo(offsetX, midY);
+        ctx.lineTo(offsetX + boardW, midY);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 
     // ── Tablero ───────────────────────────────────────────────
@@ -204,40 +269,85 @@ export class Renderer2D {
 
     _drawPieceAt(x, y, r, piece, selected = false) {
         const { ctx } = this;
-        const isOwn = this.myTeam === null || piece.team === this.myTeam;
+        const isOnlineMode = this.myTeam !== null;       // online o IA
+        const isOwn = !isOnlineMode || piece.team === this.myTeam;
         const colors = TEAM_COLORS[piece.team];
 
-        // Piezas rivales: ligeramente translúcidas
-        ctx.globalAlpha = isOwn ? 1 : 0.72;
+        // ── 1. Halo de pieza propia ────────────────────────────
+        // En modo online/IA, las piezas propias tienen un resplandor
+        // suave para diferenciarse claramente de las rivales.
+        if (isOwn && isOnlineMode) {
+            const halo = ctx.createRadialGradient(x, y, r * 0.5, x, y, r + 9);
+            halo.addColorStop(0, colors.glow);
+            halo.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.beginPath();
+            ctx.arc(x, y, r + 9, 0, Math.PI * 2);
+            ctx.fillStyle = halo;
+            ctx.fill();
+        }
 
-        // Anillo de selección
+        // ── 2. Anillo exterior rival (dashed rojo) ─────────────
+        // Las piezas rivales en online/IA llevan un anillo
+        // discontinuo de advertencia para identificarlas de un vistazo.
+        if (!isOwn && isOnlineMode) {
+            ctx.beginPath();
+            ctx.arc(x, y, r + 4, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // ── 3. Anillo de selección ─────────────────────────────
         if (selected && isOwn) {
             ctx.beginPath();
-            ctx.arc(x, y, r + 5, 0, Math.PI * 2);
+            ctx.arc(x, y, r + 6, 0, Math.PI * 2);
             ctx.strokeStyle = '#fbbf24';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2.5;
             ctx.stroke();
         }
 
-        // Círculo principal
+        // ── 4. Cuerpo principal ────────────────────────────────
+        ctx.globalAlpha = isOwn ? 1.0 : 0.78;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = colors.fill;
+
+        if (!isOwn && isOnlineMode) {
+            // Rival: relleno más oscuro y opaco para parecer "amenaza"
+            ctx.fillStyle = colors.darkFill;
+        } else {
+            ctx.fillStyle = colors.fill;
+        }
         ctx.fill();
-        ctx.strokeStyle = isOwn ? colors.stroke : '#555';
+
+        // Borde
+        ctx.strokeStyle = isOwn
+            ? colors.stroke
+            : (isOnlineMode ? 'rgba(239, 68, 68, 0.5)' : '#555');
         ctx.lineWidth = isOwn ? 2.5 : 1.5;
         ctx.stroke();
+        ctx.globalAlpha = 1;
 
-        // Corona ★ encima de las piezas propias (modo online)
-        if (isOwn && this.myTeam !== null) {
-            ctx.font = `${Math.max(9, Math.round(r * 0.45))}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+        // ── 5. Indicador sobre la pieza ────────────────────────
+        const iconSize = Math.max(9, Math.round(r * 0.46));
+        ctx.font = `${iconSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (isOnlineMode && isOwn) {
+            // Propia: estrella dorada
             ctx.fillStyle = '#fbbf24';
             ctx.fillText('★', x, y - r - 7);
+        } else if (isOnlineMode && !isOwn) {
+            // Rival: cruz roja muy sutil (no hostil, solo orientativo)
+            ctx.globalAlpha = 0.65;
+            ctx.fillStyle = '#f87171';
+            ctx.fillText('✕', x, y - r - 7);
+            ctx.globalAlpha = 1;
         }
 
-        // Indicador del balón (punto blanco)
+        // ── 6. Indicador del balón ─────────────────────────────
         if (piece.hasBall) {
             ctx.beginPath();
             ctx.arc(x + r * 0.55, y - r * 0.55, r * 0.28, 0, Math.PI * 2);
@@ -248,13 +358,13 @@ export class Renderer2D {
             ctx.stroke();
         }
 
-        // Etiqueta tipo de pieza
+        // ── 7. Etiqueta tipo de pieza ──────────────────────────
+        ctx.globalAlpha = isOwn ? 1 : 0.78;
         ctx.fillStyle = colors.text;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = `bold ${Math.max(9, Math.round(r * 0.52))}px Inter, system-ui, sans-serif`;
         ctx.fillText(piece.label, x, y);
-
         ctx.globalAlpha = 1;
     }
 

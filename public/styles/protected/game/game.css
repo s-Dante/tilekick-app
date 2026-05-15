@@ -326,3 +326,148 @@ body { overflow: hidden; }
   from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   to   { opacity: 0; transform: translate(-50%, -50%) scale(1.12); }
 }
+
+/* ============================================================
+   MOBILE PLAYER STRIPS — Estilo chess.com
+   Ocultas en escritorio, visibles solo en móvil.
+   ============================================================ */
+
+.mobile-player-strip {
+  display: none; /* oculto en desktop */
+}
+
+/* ============================================================
+   RESPONSIVE — ≤768px: layout vertical chess.com
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+  /* HUD: simplificado — solo logo, score, exit */
+  #game-hud {
+    padding: 0 var(--sp-4);
+    height: 44px;
+    gap: var(--sp-3);
+  }
+
+  /* Ocultar en HUD: chips de jugador, "vs", team badge, turno, sala */
+  .hud-block:first-child .hud-player,
+  .hud-block:first-child .hud-sep    { display: none; }
+  #my-team-badge,
+  #turn-indicator,
+  .hud-room                          { display: none !important; }
+
+  /* Score más compacto */
+  #score {
+    font-size: var(--text-lg);
+    gap: var(--sp-2);
+  }
+
+  /* Ocultar panel lateral */
+  #side-panel { display: none; }
+
+  /* game-area: solo viewport */
+  #game-area { flex-direction: column; }
+
+  /* ── Mobile Player Strips ─────────────────────────────── */
+  .mobile-player-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: 0 var(--sp-4);
+    height: 52px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-color: var(--border);
+  }
+
+  #mobile-strip-top    { border-bottom: 1px solid var(--border); }
+  #mobile-strip-bottom { border-top: 1px solid var(--border); }
+
+  /* Strip del jugador propio — acento de color izquierdo */
+  #mobile-strip-bottom {
+    border-left: 3px solid var(--primary);
+  }
+
+  .mps-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .mps-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .mps-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .mps-name {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mps-status {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-hint);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .mps-status.active   { color: var(--primary); }
+  .mps-status.opponent { color: #f87171; }
+
+  /* Score dentro de los strips */
+  .mps-score {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--text);
+    min-width: 32px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+
+  /* Timer dentro del strip propio */
+  .mps-timer {
+    font-size: var(--text-xs);
+    color: var(--text-hint);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 38px;
+    text-align: right;
+  }
+
+  .mps-timer.urgent { color: #f87171; }
+
+  /* Turn dot — indica de quién es el turno */
+  .mps-turn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .mps-turn-dot.active { background: var(--primary); }
+
+}

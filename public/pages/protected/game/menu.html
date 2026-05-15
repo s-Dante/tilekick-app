@@ -272,6 +272,29 @@
     <script src="/js/components/toast.js"></script>
     <script src="/scripts/sidebar.js"></script>
     <script>
+        // ── Bloqueo de 3D en móvil ─────────────────────────────
+        const isMobileDevice = () => window.innerWidth < 768 || navigator.maxTouchPoints > 0;
+
+        if (isMobileDevice()) {
+            const input3d = document.querySelector('input[name="gameType"][value="3d"]');
+            if (input3d) {
+                const label3d = input3d.closest('.selection-card');
+                label3d.classList.add('disabled-mobile');
+                input3d.disabled = true;
+
+                // Si ya estaba checked (no debería, pero por si acaso), poner 2D
+                if (input3d.checked) {
+                    document.querySelector('input[name="gameType"][value="2d"]').checked = true;
+                }
+
+                // Añadir badge
+                const cardText = label3d.querySelector('.card-text');
+                cardText.insertAdjacentHTML('beforeend',
+                    '<span class="desktop-only-badge">🖥 Solo escritorio</span>');
+            }
+        }
+        // ──────────────────────────────────────────────────────
+
         const aiDiffSection = document.getElementById('ai-difficulty-section');
         const submitBtn     = document.getElementById('submitBtn');
         const randomBtn     = document.getElementById('randomBtn');

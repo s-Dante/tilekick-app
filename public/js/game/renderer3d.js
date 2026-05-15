@@ -137,28 +137,31 @@ export class Renderer3D {
         this.container.appendChild(this.renderer.domElement);
 
 
-        // ── Iluminación estilizada ───────────────────────────
-        // Luz hemisférica: simula cielo + suelo con tono cálido/frío
-        const hemi = new THREE.HemisphereLight(0x87ceeb, 0x7c5c3a, 0.7);
+        // ── Iluminación base (valores conservadores de fallback) ─
+        // SceneBuilder3D sobreescribe estas luces en _buildSky()
+        // según el tema, usando LIGHT_PRESETS. Aquí ponemos valores
+        // razonables para el estado previo a la carga del escenario.
+
+        const hemi = new THREE.HemisphereLight(0x87ceeb, 0x5a6b3a, 0.55);
         this.scene.add(hemi);
 
-        // Luz direccional principal (sol)
-        const sun = new THREE.DirectionalLight(0xfff5e0, 1.2);
+        // Luz direccional principal (sol) — castShadow para sombras
+        const sun = new THREE.DirectionalLight(0xfff8e8, 1.0);
         sun.position.set(6, 12, 8);
         sun.castShadow = true;
-        sun.shadow.mapSize.width = 1024;
+        sun.shadow.mapSize.width  = 1024;
         sun.shadow.mapSize.height = 1024;
-        sun.shadow.camera.near = 0.5;
-        sun.shadow.camera.far = 30;
-        sun.shadow.camera.left = -8;
-        sun.shadow.camera.right = 8;
-        sun.shadow.camera.top = 12;
+        sun.shadow.camera.near   = 0.5;
+        sun.shadow.camera.far    = 30;
+        sun.shadow.camera.left   = -8;
+        sun.shadow.camera.right  = 8;
+        sun.shadow.camera.top    = 12;
         sun.shadow.camera.bottom = -4;
         this.scene.add(sun);
 
-        // Luz de relleno (sombra suave desde el otro lado)
-        const fill = new THREE.DirectionalLight(0x4466aa, 0.35);
-        fill.position.set(-4, 6, -6);
+        // Luz de relleno (fill light) — sin sombras, lado opuesto al sol
+        const fill = new THREE.DirectionalLight(0x4466aa, 0.28);
+        fill.position.set(-5, 5, -8);
         this.scene.add(fill);
 
         window.addEventListener('resize', () => this._onResize());

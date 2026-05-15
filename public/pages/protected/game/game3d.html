@@ -232,6 +232,18 @@
             </div>
         </header>
 
+        <!-- ── Strips móviles (chess.com style) ─────────────────── -->
+        <!-- Oponente arriba -->
+        <div id="mobile-strip-top" class="mobile-player-strip">
+            <span class="mps-turn-dot" id="mps-opp-dot"></span>
+            <div class="mps-avatar" id="mps-opp-avatar"><span>👤</span></div>
+            <div class="mps-info">
+                <span class="mps-name" id="mps-opp-name">Oponente</span>
+                <span class="mps-status opponent" id="mps-opp-status">Esperando...</span>
+            </div>
+            <div class="mps-score" id="mps-opp-score">0</div>
+        </div>
+
         <!-- Área de juego -->
         <div id="game-area">
 
@@ -272,6 +284,16 @@
             </aside>
 
         </div>
+        <!-- Jugador local abajo -->
+        <div id="mobile-strip-bottom" class="mobile-player-strip">
+            <div class="mps-score" id="mps-my-score">0</div>
+            <div class="mps-info" style="align-items:flex-end;">
+                <span class="mps-name" id="mps-my-name">Tú</span>
+                <span class="mps-status active" id="mps-my-status">Tu turno</span>
+            </div>
+            <div class="mps-avatar" id="mps-my-avatar"><span>⚽</span></div>
+            <span class="mps-turn-dot active" id="mps-my-dot"></span>
+        </div>
     </div>
 
     <!-- Importmap para Three.js -->
@@ -285,6 +307,13 @@
 </script>
 
     <script type="module">
+        // ── Guard: redirigir a 2D en dispositivos móviles ──────────
+        if (window.innerWidth < 768 || navigator.maxTouchPoints > 0) {
+            const currentParams = new URLSearchParams(window.location.search);
+            window.location.replace('/game/2d?' + currentParams.toString());
+        }
+        // ──────────────────────────────────────────────────────────
+
         import { GameState, PHASES } from '/engine/game.js';
         import { AIPlayer, AI_LEVELS } from '/engine/ai.js';
         import { Renderer3D } from '/js/game/renderer3d.js';
@@ -333,6 +362,36 @@
             list.scrollTop = list.scrollHeight;
         }
 
+        // ── Strips móviles (chess.com layout) ─────────────────
+        let mobileMyTeam = 'A';
+
+        function syncMobileStrips() {
+            const { score, turn } = gs;
+            const myScore  = mobileMyTeam === 'A' ? score.A : score.B;
+            const oppScore = mobileMyTeam === 'A' ? score.B : score.A;
+            document.getElementById('mps-my-score').textContent  = myScore;
+            document.getElementById('mps-opp-score').textContent = oppScore;
+            const isMyTurn = (myTeam === null || turn === myTeam);
+            document.getElementById('mps-my-dot').classList.toggle('active', isMyTurn);
+            document.getElementById('mps-opp-dot').classList.toggle('active', !isMyTurn);
+            const myS  = document.getElementById('mps-my-status');
+            const oppS = document.getElementById('mps-opp-status');
+            myS.textContent  = isMyTurn ? 'Tu turno'     : 'Esperando...';
+            myS.className    = `mps-status ${isMyTurn ? 'active' : ''}`;
+            oppS.textContent = isMyTurn ? 'Esperando...' : 'Turno del rival';
+            oppS.className   = `mps-status ${!isMyTurn ? 'active' : 'opponent'}`;
+        }
+
+        function setMobilePlayer(isMe, name, avatarSrc) {
+            const nameEl   = document.getElementById(isMe ? 'mps-my-name'   : 'mps-opp-name');
+            const avatarEl = document.getElementById(isMe ? 'mps-my-avatar' : 'mps-opp-avatar');
+            if (nameEl)   nameEl.textContent = name;
+            if (avatarEl && avatarSrc) {
+                avatarEl.innerHTML = `<img src="${avatarSrc}" alt="${name}" onerror="this.parentElement.innerHTML='<span>👤</span>'">`;
+            }
+        }
+        // ──────────────────────────────────────────────────────
+
         function connectSlot(num, name, team, isMine) {
             const slot   = document.getElementById(`side-p${num}`);
             const nameEl = document.getElementById(`side-p${num}-name`);
@@ -346,6 +405,14 @@
             const hudName = document.getElementById(`hud-p${num}-name`);
             if (hudName) hudName.textContent = name;
             document.getElementById(`hud-p${num}`)?.classList.add('connected');
+
+            // Sincronizar strips móviles
+            if (isMine) {
+                mobileMyTeam = team;
+                setMobilePlayer(true,  name, me.avatar_url ?? null);
+            } else {
+                setMobilePlayer(false, name, null);
+            }
         }
 
         function updateHUD() {
@@ -353,6 +420,7 @@
             document.getElementById('score-a').textContent = score.A;
             document.getElementById('score-b').textContent = score.B;
             document.getElementById('turn-team').textContent = turn;
+            syncMobileStrips();
 
             const isMyTurn = (myTeam === null || turn === myTeam);
             document.getElementById('turn-indicator').style.color =

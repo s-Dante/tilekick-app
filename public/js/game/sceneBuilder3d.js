@@ -5,7 +5,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { Water } from 'three/addons/objects/Water.js';
 
 // ═══════════════════════════════════════════════════════════
 //  ██  PARÁMETROS AJUSTABLES  ██
@@ -29,12 +28,34 @@ const TILE_LEVEL_HEIGHTS = [1.0, 0.70, 0.40, 0.10];  // escala Y relativa
 // Level 3 (impasable): poner a 0 lo hace invisible
 const TILE_LEVEL_3_VISIBLE = false;  // false = invisible cuando impasable
 
-// ── Iluminación ──────────────────────────────────────────────
-const LIGHT_CFG = {
-    hemi: { sky: 0x87ceeb, ground: 0x7c5c3a, intensity: 0.4 },   // luz hemisférica
-    sun: { color: 0xfff5e0, intensity: 0.8 },                    // luz direccional (sol)
-    fill: { color: 0x4466aa, intensity: 0.2 },                    // luz de relleno
-    exposure: 0.35,  // toneMappingExposure del renderer (más bajo = menos sobreexpuesto)
+// ── Iluminación por tema ─────────────────────────────────────
+//
+// Cada tema tiene su propio preset de luces para que la
+// atmósfera se sienta coherente con el escenario:
+//
+//   grass  → día soleado / estadio de fútbol clásico
+//   sand   → tarde cálida en la playa, luz dorada
+//   cement → urbano nublado, luz fría y difusa
+//
+const LIGHT_PRESETS = {
+    grass: {
+        hemi:     { sky: 0x9ec8f5, ground: 0x3a6b28, intensity: 0.65 },
+        sun:      { color: 0xfff8e8, intensity: 1.3 },
+        fill:     { color: 0x4488cc, intensity: 0.28, pos: [-5, 5, -8] },
+        exposure: 0.55,
+    },
+    sand: {
+        hemi:     { sky: 0xf0c870, ground: 0xb87040, intensity: 0.75 },
+        sun:      { color: 0xffcc55, intensity: 1.1 },   // sol naranja dorado
+        fill:     { color: 0xff9944, intensity: 0.20, pos: [-5, 4, -7] },  // rebote cálido
+        exposure: 0.50,
+    },
+    cement: {
+        hemi:     { sky: 0x8899bb, ground: 0x3a3f4a, intensity: 0.55 },
+        sun:      { color: 0xdde8f5, intensity: 0.75 },  // sol frío / nublado
+        fill:     { color: 0x5566aa, intensity: 0.32, pos: [-4, 7, -6] },
+        exposure: 0.44,
+    },
 };
 
 // ── Parámetros del Sky por tema ──────────────────────────────
@@ -45,24 +66,106 @@ const LIGHT_CFG = {
 // elevation   [0–90]:  altura del sol en grados
 // azimuth     [0–360]: orientación del sol (0/360=Norte, 180=Sur)
 const SKY_PRESETS = {
-    grass: { turbidity: 3, rayleigh: 1.2, mieCoef: 0.003, mieDir: 0.7, elevation: 22, azimuth: 180 },
-    sand: { turbidity: 8, rayleigh: 1.8, mieCoef: 0.015, mieDir: 0.85, elevation: 12, azimuth: 210 },
-    cement: { turbidity: 1, rayleigh: 0, mieCoef: 0.03, mieDir: 0.75, elevation: 45, azimuth: 180 },
+    grass:  { turbidity: 2.5, rayleigh: 1.5, mieCoef: 0.002, mieDir: 0.75, elevation: 28, azimuth: 160 },
+    sand:   { turbidity: 7.0, rayleigh: 2.0, mieCoef: 0.012, mieDir: 0.90, elevation: 10, azimuth: 220 },
+    cement: { turbidity: 12,  rayleigh: 0.5, mieCoef: 0.045, mieDir: 0.60, elevation: 40, azimuth: 200 },
 };
 
-// ── Agua ─────────────────────────────────────────────────────
-const WATER_CFG = {
-    enabled: true,
-    color: 0x006994,   // color base del agua
-    distortionScale: 1.5,      // ondulación (0=plano, 8=muy agitado)
-    alpha: 0.88,       // transparencia (0=invisible, 1=opaco)
-    sunColor: 0xffffff,
-    speed: 1.0,        // velocidad de animación (multiplicador)
-    // Área del agua: cubre el tablero completo en Y negativa
-    width: 4.0,               // ancho (columnas 0–4 = 4 unidades)
-    height: 9.0,               // largo (filas 0–9 = 9 unidades)
-    posY: -0.15,             // altura Y (negativa = debajo de los tiles)
+// ── Agua por tema — shader sinusoidal propio ─────────────────
+//
+// En lugar del Water addon de Three.js (espejo de reflexión),
+// usamos un ShaderMaterial custom con desplazamiento real de
+// vértices en ondas sinusoidales superpuestas.
+//
+// colorShallow → color en las crestas de ola (más claro)
+// colorDeep    → color en los valles (más oscuro/profundo)
+// amplitude    → altura de las olas en unidades Three.js
+// frequency    → densidad de las olas (más = olas pequeñas)
+// speed        → velocidad de la animación
+//
+const WATER_PRESETS = {
+    grass: {
+        enabled:      true,
+        colorShallow: 0x1a9e8a,   // turquesa suave (canal tranquilo)
+        colorDeep:    0x033d50,   // azul profundo
+        amplitude:    0.045,
+        frequency:    2.2,
+        speed:        0.45,
+        alpha:        0.82,
+    },
+    sand: {
+        enabled:      true,
+        colorShallow: 0x00b4d8,   // azul caribe brillante
+        colorDeep:    0x023e8a,   // azul mar profundo
+        amplitude:    0.09,
+        frequency:    1.8,
+        speed:        0.85,
+        alpha:        0.86,
+    },
+    cement: {
+        enabled:      true,
+        colorShallow: 0x2d4a5a,   // agua urbana oscura
+        colorDeep:    0x0d1a22,
+        amplitude:    0.022,
+        frequency:    3.2,
+        speed:        0.18,
+        alpha:        0.70,
+    },
 };
+
+// Shaders GLSL para el agua estilizada
+const WATER_VERTEX_SHADER = /* glsl */`
+    uniform float uTime;
+    uniform float uAmplitude;
+    uniform float uFrequency;
+    uniform float uSpeed;
+
+    varying float vHeight;
+    varying vec2  vUv;
+
+    void main() {
+        vUv = uv;
+        vec3 pos = position;
+
+        // Tres oleadas superpuestas en distintas direcciones y frecuencias
+        float w1 = sin(pos.x * uFrequency        + uTime * uSpeed)        * uAmplitude;
+        float w2 = sin(pos.z * uFrequency * 0.75 + uTime * uSpeed * 1.3)  * uAmplitude * 0.65;
+        float w3 = sin((pos.x * 0.6 + pos.z * 0.8) * uFrequency * 1.2
+                       + uTime * uSpeed * 0.85)                            * uAmplitude * 0.42;
+
+        float wave = w1 + w2 + w3;
+        pos.y    += wave;
+        vHeight   = wave / (uAmplitude * 2.1);   // normalizado [-0.5, 0.5]
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+`;
+
+const WATER_FRAGMENT_SHADER = /* glsl */`
+    uniform vec3  uColorShallow;
+    uniform vec3  uColorDeep;
+    uniform float uOpacity;
+    uniform float uTime;
+
+    varying float vHeight;
+    varying vec2  vUv;
+
+    void main() {
+        // Mezcla de color profundo → superficial según altura de ola
+        float t = clamp(vHeight + 0.5, 0.0, 1.0);
+        vec3 color = mix(uColorDeep, uColorShallow, t);
+
+        // Destellos de luz en superficie (shimmer)
+        float sh = sin(vUv.x * 32.0 + uTime * 2.8) * sin(vUv.y * 28.0 + uTime * 2.1) * 0.055;
+        color += max(sh, 0.0);
+
+        // Espuma suave en las crestas
+        float foam = smoothstep(0.30, 0.50, vHeight);
+        color = mix(color, vec3(0.92, 0.97, 1.0), foam * 0.22);
+
+        gl_FragColor = vec4(color, uOpacity);
+    }
+`;
 
 // ═══════════════════════════════════════════════════════════
 //  Constantes internas (no modificar a menos que sepas)
@@ -125,21 +228,23 @@ export class SceneBuilder3D {
 
     async build() {
         this._showLoadingOverlay();
-        const themeData = THEME_MAP[this.theme];
+        const themeData  = THEME_MAP[this.theme];
+        const lightCfg   = LIGHT_PRESETS[this.theme] ?? LIGHT_PRESETS.grass;
+        const waterPreset = WATER_PRESETS[this.theme] ?? WATER_PRESETS.grass;
 
-        // Aplicar configuración de luz y exposure al renderer
+        // Tone mapping — exposure se actualiza en _buildSky() según tema
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = LIGHT_CFG.exposure;
+        this.renderer.toneMappingExposure = lightCfg.exposure;
 
         try {
             if (this.quality === 'low') {
                 this._buildSky(themeData);
-                if (WATER_CFG.enabled) this._buildWater();
+                if (waterPreset.enabled) this._buildWater();
             } else {
                 // Sky PRIMERO → scene.environment listo antes de que los
                 // materiales GLTF se registren en la escena
                 this._buildSky(themeData);
-                if (WATER_CFG.enabled) this._buildWater();
+                if (waterPreset.enabled) this._buildWater();
 
                 // Cargar todos los modelos en paralelo
                 await Promise.all([
@@ -216,65 +321,68 @@ export class SceneBuilder3D {
     // ──────────────────────────────────────────────────────────
 
     _buildSky(themeData) {
-        const cfg = SKY_PRESETS[this.theme] ?? SKY_PRESETS.grass;
+        const skyCfg   = SKY_PRESETS[this.theme]   ?? SKY_PRESETS.grass;
+        const lightCfg = LIGHT_PRESETS[this.theme]  ?? LIGHT_PRESETS.grass;
 
         // ── 1. Sky dome ───────────────────────────────────────
         const sky = new Sky();
         sky.scale.setScalar(10000);
         this.scene.add(sky);
         const u = sky.material.uniforms;
-        u['turbidity'].value       = cfg.turbidity;
-        u['rayleigh'].value        = cfg.rayleigh;
-        u['mieCoefficient'].value  = cfg.mieCoef;
-        u['mieDirectionalG'].value = cfg.mieDir;
+        u['turbidity'].value       = skyCfg.turbidity;
+        u['rayleigh'].value        = skyCfg.rayleigh;
+        u['mieCoefficient'].value  = skyCfg.mieCoef;
+        u['mieDirectionalG'].value = skyCfg.mieDir;
 
-        const phi    = THREE.MathUtils.degToRad(90 - cfg.elevation);
-        const theta  = THREE.MathUtils.degToRad(cfg.azimuth);
+        const phi    = THREE.MathUtils.degToRad(90 - skyCfg.elevation);
+        const theta  = THREE.MathUtils.degToRad(skyCfg.azimuth);
         const sunVec = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
         u['sunPosition'].value.copy(sunVec);
         this.scene.background = null;
         this.skyObject = sky;
 
-        // ── 2. Alinear luz de sol con la posición del sky ─────
+        // Guardar sunVec para el Water (evita el bug del "espejo")
+        this._sunVec = sunVec.clone();
+
+        // ── 2. Aplicar exposure del tema al renderer ──────────
+        this.renderer.toneMappingExposure = lightCfg.exposure;
+
+        // ── 3. Alinear luces de escena con sky del tema ───────
         this.scene.traverse(child => {
             if (child.isDirectionalLight && child.castShadow) {
                 child.position.copy(sunVec.clone().multiplyScalar(20));
-                child.intensity = LIGHT_CFG.sun.intensity;
+                child.color.setHex(lightCfg.sun.color);
+                child.intensity = lightCfg.sun.intensity;
             }
             if (child.isHemisphereLight) {
-                child.intensity = LIGHT_CFG.hemi.intensity;
+                child.color.setHex(lightCfg.hemi.sky);
+                child.groundColor.setHex(lightCfg.hemi.ground);
+                child.intensity = lightCfg.hemi.intensity;
+            }
+            if (child.isDirectionalLight && !child.castShadow) {
+                // Luz de relleno (fill light)
+                const fp = lightCfg.fill.pos ?? [-5, 5, -8];
+                child.position.set(fp[0], fp[1], fp[2]);
+                child.color.setHex(lightCfg.fill.color);
+                child.intensity = lightCfg.fill.intensity;
             }
         });
 
-        // ── 3. IBL: hornear el sky como environment map ───────
+        // ── 4. IBL: hornear el sky como environment map ───────
         //
-        // SIN esto, los materiales PBR de los GLTF solo reciben
-        // las luces manuales y quedan muy oscuros aunque el sky
-        // se vea brillante. PMREMGenerator convierte el cielo en
-        // iluminación global (diffuse + specular) para todos los
-        // materiales de la escena.
-        //
-        // ── AJUSTE IBL ────────────────────────────────────────
-        // envMapIntensity: cuánto influye el environment en los
-        //   materiales (0 = solo luces manuales, 1 = IBL completo,
-        //   >1 = potencia el efecto)
-        const ENV_MAP_INTENSITY = 1.2; // ← AJUSTA ESTE VALOR
-        // ─────────────────────────────────────────────────────
+        // PMREMGenerator convierte el sky en iluminación global
+        // (diffuse + specular) para los materiales PBR de los GLTF.
+        const ENV_MAP_INTENSITY = 1.0;
 
         const pmrem = new THREE.PMREMGenerator(this.renderer);
         pmrem.compileEquirectangularShader();
 
-        // Renderizar el sky en una escena auxiliar para el cubemap
         const skyScene = new THREE.Scene();
-        skyScene.add(sky.clone());  // clon temporal (sky principal queda en la escena)
+        skyScene.add(sky.clone());
         const envRT = pmrem.fromScene(skyScene);
         pmrem.dispose();
 
-        // Aplicar el environment a toda la escena
         this.scene.environment = envRT.texture;
-
-        // Intensidad del environment en todos los materiales existentes
-        // (y en los que se añadan después, vía onBeforeRender o traverse)
         this._applyEnvIntensity(ENV_MAP_INTENSITY);
         this._envMapIntensity = ENV_MAP_INTENSITY;
     }
@@ -299,34 +407,37 @@ export class SceneBuilder3D {
     // ──────────────────────────────────────────────────────────
 
     _buildWater() {
-        const cfg = WATER_CFG;
-        const geo = new THREE.PlaneGeometry(cfg.width, cfg.height);
+        const preset = WATER_PRESETS[this.theme] ?? WATER_PRESETS.grass;
+        if (!preset.enabled) return;
 
-        // Textura de normales para el agua (CDN de Three.js)
-        const waterNormals = new THREE.TextureLoader().load(
-            'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/textures/waternormals.jpg',
-            (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; }
-        );
+        // PlaneGeometry con muchos segmentos → los vértices se desplazan
+        // individualmente creando oleaje geométrico real, no solo normal-map.
+        const geo = new THREE.PlaneGeometry(15, 15, 90, 90);
 
-        const water = new Water(geo, {
-            textureWidth: 512,
-            textureHeight: 512,
-            waterNormals,
-            sunDirection: new THREE.Vector3(0, 1, 0),
-            sunColor: cfg.sunColor,
-            waterColor: cfg.color,
-            distortionScale: cfg.distortionScale,
-            alpha: cfg.alpha,
-            fog: false,
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime:         { value: 0.0 },
+                uAmplitude:    { value: preset.amplitude },
+                uFrequency:    { value: preset.frequency },
+                uSpeed:        { value: preset.speed },
+                uColorShallow: { value: new THREE.Color(preset.colorShallow) },
+                uColorDeep:    { value: new THREE.Color(preset.colorDeep) },
+                uOpacity:      { value: preset.alpha },
+            },
+            vertexShader:   WATER_VERTEX_SHADER,
+            fragmentShader: WATER_FRAGMENT_SHADER,
+            transparent:    true,
+            side:           THREE.DoubleSide,
+            depthWrite:     false,
         });
 
-        // El plano de Water está en XY por defecto → rotar para que quede en XZ
+        const water = new THREE.Mesh(geo, material);
+        // Rotar de XY (defecto) a XZ (horizontal)
         water.rotation.x = -Math.PI / 2;
-        // Centrar en el tablero: X centro = (BOARD_COLS-1)/2 = 2, Z centro = (BOARD_ROWS-1)/2 = 4.5
-        water.position.set(2, cfg.posY, -10);
-        water.scale.set(15, 15, 1);
+        // Posición: centrado debajo del tablero y extendido alrededor
+        water.position.set(2, -0.15, -10);
         water.name = 'WaterPlane';
- 
+
         this.scene.add(water);
         this.waterMesh = water;
     }
@@ -336,8 +447,8 @@ export class SceneBuilder3D {
     // ──────────────────────────────────────────────────────────
 
     tickWater(delta) {
-        if (!this.waterMesh) return;
-        this.waterMesh.material.uniforms['time'].value += delta * WATER_CFG.speed;
+        if (!this.waterMesh?.material?.uniforms?.uTime) return;
+        this.waterMesh.material.uniforms.uTime.value += delta;
     }
 
     // ──────────────────────────────────────────────────────────
