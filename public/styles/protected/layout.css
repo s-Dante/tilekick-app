@@ -222,9 +222,112 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 900px) {
-  #sidebar { width: 80px; }
-  #sidebar-header h2, .nav-user-info, .nav-dots, #sidebar-nav span { display: none; }
-  #sidebar-nav li a { justify-content: center; padding: 12px; }
-  #content { padding: 24px; }
+/* ============================================================
+   MOBILE — Top Navigation Bar
+   ============================================================ */
+
+#mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 200;
+}
+
+#mobile-logo {
+  font-size: 1.15rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  text-transform: uppercase;
+}
+
+#mobile-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#mobile-hamburger {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition);
+}
+
+#mobile-hamburger:hover {
+  background: var(--surface-2);
+}
+
+/* Dropdown de navegación (hamburger) — abre hacia abajo desde la izquierda */
+#mobile-nav-dropdown {
+  position: fixed;
+  top: 56px;
+  left: auto;
+  right: 55px;
+  bottom: auto;
+  margin-bottom: 0;
+  margin-top: 4px;
+  min-width: 180px;
+}
+
+/* Dropdown de perfil (avatar) — abre hacia abajo desde la derecha */
+#mobile-profile-dropdown {
+  position: fixed;
+  top: 56px;
+  right: 12px;
+  left: auto;
+  bottom: auto;
+  margin-bottom: 0;
+  margin-top: 4px;
+  min-width: 160px;
+}
+
+/* Animación de apertura hacia abajo */
+#mobile-nav-dropdown.show,
+#mobile-profile-dropdown.show {
+  animation: slideDown 0.18s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Link activo en el dropdown de navegación */
+.mobile-nav-link.active {
+  color: var(--primary) !important;
+  background: var(--surface-2);
+}
+
+@media (max-width: 768px) {
+  #sidebar {
+    display: none;
+  }
+
+  #mobile-topbar {
+    display: flex;
+  }
+
+  #layout {
+    flex-direction: column;
+  }
+
+  #content {
+    padding: 76px 20px 32px; /* 56px topbar + 20px gap */
+    max-width: 100%;
+  }
 }

@@ -162,6 +162,10 @@
   letter-spacing: 0.05em;
 }
 
+/* Labels responsivos en thead */
+.th-short { display: none; }
+.th-full  { display: inline; }
+
 /* ── Table Section ─────────────────────────────────────────── */
 .ranking-section {
   margin-top: var(--sp-12);
@@ -341,4 +345,83 @@
   padding: 0 8px;
   color: var(--text-hint);
   font-weight: 700;
+}
+
+/* ============================================================
+   RESPONSIVE — Mobile
+   ============================================================ */
+
+@media (max-width: 640px) {
+  /* ── Podio compacto ── */
+  .podium-wrap {
+    gap: var(--sp-2);
+  }
+
+  .podium-player {
+    padding: var(--sp-4) var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Alturas reducidas */
+  .podium-h-1 {
+    min-height: 180px;
+    padding-top: var(--sp-8);
+  }
+  .podium-h-2 { min-height: 145px; }
+  .podium-h-3 { min-height: 115px; }
+
+  /* Avatar más pequeño */
+  .podium-avatar-wrap img,
+  .avatar-fallback {
+    width: 52px;
+    height: 52px;
+  }
+
+  /* Medallita más pequeña */
+  .podium-place-badge {
+    width: 36px;
+    height: 36px;
+    font-size: 1.5rem;
+    top: -18px;
+  }
+
+  .podium-username {
+    font-size: var(--text-xs);
+    max-width: 80px;
+  }
+
+  .podium-elo {
+    font-size: 1.1rem;
+  }
+
+  /* Ocultar victorias, solo username + ELO */
+  .podium-wins {
+    display: none;
+  }
+
+  /* ── Tabla compacta ── */
+  #leaderboard-table thead th,
+  #leaderboard-table tbody td {
+    padding: var(--sp-3) var(--sp-3);
+    font-size: var(--text-xs);
+  }
+
+  /* Mostrar solo avatar en la columna Jugador (ocultar nombre) */
+  .player-name-wrap span:not(.badge-you) {
+    display: none;
+  }
+
+  .player-name-wrap {
+    gap: 6px;
+  }
+
+  /* Ocultar columna % Victoria */
+  #leaderboard-table th:nth-child(7),
+  #leaderboard-table td:nth-child(7) {
+    display: none;
+  }
+
+  /* Headers abreviados con emojis usando spans */
+  .th-full { display: none; }
+  .th-short { display: inline; }
 }

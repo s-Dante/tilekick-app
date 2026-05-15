@@ -161,40 +161,63 @@
                 <div class="menu-section" id="rules-section">
                     <h2 class="section-title">4. Reglas de Partida</h2>
                     <div class="rules-grid">
+
+                        <!-- Goles para ganar -->
                         <div class="rules-group">
                             <div class="rules-group-label">⚽ Goles para ganar</div>
                             <div class="rules-chips">
                                 <label class="chip-card">
                                     <input type="radio" name="goals" value="3">
-                                    <span class="chip-label">3 goles</span>
+                                    <span class="chip-label">
+                                        <span>3 goles</span>
+                                        <span class="chip-icon">🔥</span>
+                                    </span>
                                 </label>
                                 <label class="chip-card">
                                     <input type="radio" name="goals" value="5" checked>
-                                    <span class="chip-label">5 goles</span>
+                                    <span class="chip-label">
+                                        <span>5 goles</span>
+                                        <span class="chip-icon">⚽</span>
+                                    </span>
                                 </label>
                                 <label class="chip-card">
                                     <input type="radio" name="goals" value="7">
-                                    <span class="chip-label">7 goles</span>
+                                    <span class="chip-label">
+                                        <span>7 goles</span>
+                                        <span class="chip-icon">🏆</span>
+                                    </span>
                                 </label>
                             </div>
                         </div>
+
+                        <!-- Límite de tiempo -->
                         <div class="rules-group">
-                            <div class="rules-group-label">⏱ Límite de tiempo</div>
+                            <div class="rules-group-label">⏳ Límite de tiempo</div>
                             <div class="rules-chips">
                                 <label class="chip-card">
                                     <input type="radio" name="time" value="0" checked>
-                                    <span class="chip-label">Ilimitado</span>
+                                    <span class="chip-label">
+                                        <span>Sin límite</span>
+                                        <span class="chip-icon">♾️</span>
+                                    </span>
                                 </label>
                                 <label class="chip-card">
                                     <input type="radio" name="time" value="300">
-                                    <span class="chip-label">Tradicional <small>5 min</small></span>
+                                    <span class="chip-label">
+                                        <span>5 minutos</span>
+                                        <span class="chip-icon">⏱</span>
+                                    </span>
                                 </label>
                                 <label class="chip-card">
                                     <input type="radio" name="time" value="180">
-                                    <span class="chip-label">Blitz <small>3 min</small></span>
+                                    <span class="chip-label">
+                                        <span>Blitz <small>3 min</small></span>
+                                        <span class="chip-icon">⚡</span>
+                                    </span>
                                 </label>
                             </div>
                         </div>
+
                     </div>
                 </div>
 
@@ -250,21 +273,26 @@
     <script src="/scripts/sidebar.js"></script>
     <script>
         const aiDiffSection = document.getElementById('ai-difficulty-section');
+        const submitBtn     = document.getElementById('submitBtn');
+        const randomBtn     = document.getElementById('randomBtn');
 
-        // Mostrar/ocultar secciones y botones según el modo seleccionado
+        // Centraliza la lógica de UI según el modo activo
+        function applyModeUI(mode) {
+            submitBtn.textContent       = mode === 'online' ? 'Buscar partida' : 'Jugar ahora';
+            randomBtn.style.display     = mode === 'online' ? '' : 'none';
+            aiDiffSection.style.display = mode === 'ai'     ? 'block' : 'none';
+        }
+
+        // Inicializar al cargar la página con el modo ya seleccionado (fix botón aleatorio)
+        applyModeUI(document.querySelector('input[name="mode"]:checked')?.value ?? 'online');
+
+        // Actualizar al cambiar modo
         document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const mode = radio.value;
-                const submitBtn = document.getElementById('submitBtn');
-                const randomBtn = document.getElementById('randomBtn');
-                submitBtn.textContent = mode === 'online' ? 'Buscar partida' : 'Jugar ahora';
-                randomBtn.style.display = mode === 'online' ? '' : 'none';
-                aiDiffSection.style.display = mode === 'ai' ? 'block' : 'none';
-            });
+            radio.addEventListener('change', () => applyModeUI(radio.value));
         });
 
         // Botón de partida aleatoria
-        document.getElementById('randomBtn').addEventListener('click', () => {
+        randomBtn.addEventListener('click', () => {
             const form     = document.getElementById('gameMenuForm');
             const goals    = form.querySelector('input[name="goals"]:checked')?.value ?? '5';
             const time     = form.querySelector('input[name="time"]:checked')?.value  ?? '0';

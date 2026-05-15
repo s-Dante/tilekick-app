@@ -158,3 +158,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 768px) {
+  .dash-hero h1 {
+    font-size: var(--text-3xl);
+  }
+
+  /* CTA cards: el texto ocupa todo el ancho, botón va al final */
+  .cta-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-5);
+    padding: var(--sp-6);
+  }
+
+  .cta-text {
+    width: 100%;
+  }
+
+  .cta-card .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

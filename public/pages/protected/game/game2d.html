@@ -164,15 +164,15 @@
                 </div>
             </div>
             <div class="go-share">
-                <button class="go-share-btn go-share-fb" id="goShareFb" onclick="shareResult('facebook')">
+                <button class="go-share-btn" onclick="shareResult('facebook')">
                     <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="#1877F2" d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.696 4.533-4.696 1.312 0 2.686.236 2.686.236v2.97H15.83c-1.491 0-1.956.93-1.956 1.886v2.255h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
-                    Compartir
+                    Facebook
                 </button>
                 <button class="go-share-btn" onclick="shareResult('twitter')">
                     <svg width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.629 5.905-5.629zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                    Tuitear
+                    X / Twitter
                 </button>
-                <button class="go-share-btn" onclick="shareResult('copy')">
+                <button class="go-share-btn" id="go-copy-btn" onclick="shareResult('copy')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                     Copiar
                 </button>
@@ -492,71 +492,91 @@
             }, 2700);
         }
 
-        // ── Facebook SDK ──────────────────────────────────────
-        // Se inicializa de forma asíncrona con el App ID del servidor
-        let _fbReady = false;
-        fetch('/api/config/public')
-            .then(r => r.json())
-            .then(({ facebookAppId }) => {
-                if (!facebookAppId) return;
-                window.fbAsyncInit = function () {
-                    FB.init({ appId: facebookAppId, xfbml: false, version: 'v19.0' });
-                    _fbReady = true;
-                };
-                const s = document.createElement('script');
-                s.src   = 'https://connect.facebook.net/es_LA/sdk.js';
-                s.async = true;
-                s.defer = true;
-                document.head.appendChild(s);
-            })
-            .catch(() => {}); // graceful fallback si no hay config
+        // ── Social Share ──────────────────────────────────────
+        //
+        // Cómo funciona:
+        //   • Facebook y Twitter leen los meta og: de la URL /share para mostrar
+        //     imagen (win/lose/draw.png) + título + descripción en el preview.
+        //   ⚠️  Eso requiere que el servidor sea accesible públicamente.
+        //     En localhost los crawlers no llegan → no hay preview de imagen.
+        //     En producción (dominio real) funciona completo.
+        //
+        //   • "Copiar" intenta copiar la imagen al portapapeles (Chrome/Edge) y
+        //     siempre copia el texto como respaldo.
 
         function shareResult(platform) {
             const d      = window.gameResultData ?? {};
             const result = d.isDraw ? 'draw' : d.isMyWin ? 'win' : 'lose';
             const scoreA = d.score?.A ?? 0;
             const scoreB = d.score?.B ?? 0;
-            const score  = `${scoreA}-${scoreB}`;
+            const map    = params.get('map') || 'estadio';
 
-            // URL de la página /share con OG tags dinámicos — Facebook y Twitter
-            // scrapearan esta URL y mostraran la imagen correcta en la vista previa.
-            const sharePageUrl = `${location.origin}/share?result=${result}&score=${encodeURIComponent(score)}&map=${encodeURIComponent(params.get('map') || 'TileKick')}`;
-            const text = `¡Acabo de jugar TileKick! ${result === 'win' ? '🏆 ¡Gané' : result === 'lose' ? '😔 Perdí' : '🤝 Empaté'} ${scoreA}–${scoreB}. ¿Me retas? 🎮⚽`;
+            // URL con OG tags — la página /share sirve la imagen y redirige al home
+            const shareUrl  = `${location.origin}/share?result=${result}&score=${encodeURIComponent(`${scoreA}-${scoreB}`)}&map=${encodeURIComponent(map)}`;
+            const imageUrl  = `${location.origin}/assets/img/share/${result}.png`;
+
+            const texts = {
+                win:  `🏆 ¡Gané en TileKick! Marcador: ${scoreA}–${scoreB}. El fútbol táctico que no sabías que necesitabas. ¿Me retas? ⚽🎮`,
+                lose: `😤 Caída épica ${scoreA}–${scoreB} en TileKick, pero vuelvo más fuerte. ¿Puedes ganarme tú? ⚽🎮`,
+                draw: `🤝 ¡Empate táctico ${scoreA}–${scoreB} en TileKick! Ninguno cedió. ¿Tú rompes el empate? ⚽🎮`,
+            };
+            const text = texts[result];
 
             if (platform === 'facebook') {
-                if (_fbReady && typeof FB !== 'undefined') {
-                    FB.ui({
-                        method:  'share',
-                        href:    sharePageUrl,
-                        hashtag: '#TileKick',
-                    }, () => {});
-                } else {
-                    window.open(
-                        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePageUrl)}`,
-                        '_blank', 'width=600,height=500'
-                    );
-                }
+                // Facebook lee los og: de shareUrl y muestra imagen + descripción en el preview
+                window.open(
+                    `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+                    'fb-share', 'width=620,height=540,noopener,noreferrer'
+                );
                 return;
             }
 
             if (platform === 'twitter') {
-                // Web intent incluye la sharePageUrl para que Twitter muestre la Twitter Card con imagen
+                // El tweet incluye texto del resultado + shareUrl (Twitter Card en producción)
                 window.open(
-                    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(sharePageUrl)}&hashtags=TileKick`,
-                    '_blank', 'width=600,height=420'
+                    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}&hashtags=TileKick`,
+                    'tw-share', 'width=600,height=420,noopener,noreferrer'
                 );
                 return;
             }
 
             if (platform === 'copy') {
-                navigator.clipboard?.writeText(`${text} ${sharePageUrl}`).then(() => {
-                    const btn = document.querySelector('.go-share-btn:last-child');
-                    if (btn) {
-                        const orig = btn.innerHTML;
-                        btn.textContent = '✓ Copiado';
-                        setTimeout(() => { btn.innerHTML = orig; }, 2000);
-                    }
-                }).catch(() => {});
+                const copyText = `${text}\n${shareUrl}`;
+                const btn = document.getElementById('go-copy-btn');
+
+                // Intentar copiar imagen + texto al portapapeles (Chrome/Edge)
+                fetch(imageUrl)
+                    .then(r => r.blob())
+                    .then(async (imgBlob) => {
+                        try {
+                            await navigator.clipboard.write([
+                                new ClipboardItem({
+                                    'image/png': imgBlob,
+                                    'text/plain': new Blob([copyText], { type: 'text/plain' }),
+                                })
+                            ]);
+                        } catch (_) {
+                            // Fallback: solo texto (Firefox u otros navegadores)
+                            await navigator.clipboard.writeText(copyText);
+                        }
+                        if (btn) {
+                            const orig = btn.innerHTML;
+                            btn.innerHTML = '<span>✓ Copiado</span>';
+                            setTimeout(() => { btn.innerHTML = orig; }, 2000);
+                        }
+                    })
+                    .catch(() => {
+                        // Sin acceso a imagen: copiar solo texto
+                        navigator.clipboard?.writeText(copyText)
+                            .then(() => {
+                                if (btn) {
+                                    const orig = btn.innerHTML;
+                                    btn.innerHTML = '<span>✓ Texto copiado</span>';
+                                    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+                                }
+                            })
+                            .catch(() => prompt('Copia este mensaje:', copyText));
+                    });
                 return;
             }
         }

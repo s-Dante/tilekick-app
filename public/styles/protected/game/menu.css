@@ -109,30 +109,41 @@
   color: var(--text-muted);
 }
 
-/* --- Rules Section (chips) --- */
+/* --- Rules Section — dos grupos lado a lado como cards --- */
 .rules-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
 
 .rules-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 20px 20px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
+  transition: border-color var(--transition);
+}
+
+.rules-group:focus-within {
+  border-color: var(--primary);
 }
 
 .rules-group-label {
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: 700;
   color: var(--text-muted);
-  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 .rules-chips {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .chip-card {
@@ -150,11 +161,11 @@
 .chip-label {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 8px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-muted);
@@ -162,23 +173,40 @@
   white-space: nowrap;
 }
 
+.chip-label .chip-icon {
+  font-size: 1rem;
+  opacity: 0.7;
+}
+
 .chip-label small {
   font-size: var(--text-xs);
-  opacity: 0.7;
   font-weight: 400;
+  opacity: 0.6;
+  margin-left: auto;
 }
 
 .chip-card:hover .chip-label {
   border-color: var(--primary);
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .chip-card input:checked + .chip-label {
   border-color: var(--primary);
-  background: rgba(53, 64, 36, 0.12);
+  background: rgba(53, 64, 36, 0.10);
   color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
+}
+
+.chip-card input:checked + .chip-label .chip-icon {
+  opacity: 1;
+}
+
+/* Responsive: en pantallas pequeñas colapsar a 1 columna */
+@media (max-width: 600px) {
+  .rules-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --- Submit Bar --- */
@@ -195,4 +223,22 @@
   font-size: var(--text-base);
   font-weight: 700;
   border-radius: var(--radius-xl);
+}
+
+@media (max-width: 768px) {
+
+  #content {
+    margin: 0 0;
+  }
+
+  .submit-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .submit-bar .btn-lg {
+    width: 100%;
+    padding: 14px 24px;
+  }
 }

@@ -715,57 +715,81 @@ app.post('/api/recovery/reset', async (req, res) => {
 
 /**
  * GET /share — Página pública con Open Graph dinámico para compartir resultados.
- * Facebook y Twitter scrapean esta URL y muestran la imagen correcta en el preview.
+ *
+ * Los crawlers de Facebook/WhatsApp/Telegram leen los meta og: de esta URL
+ * y muestran la imagen, título y descripción del resultado en el preview.
+ * Los usuarios reales son redirigidos al home de inmediato (los bots no ejecutan JS).
+ *
+ * ⚠️  En localhost el preview de Facebook no aparece porque sus servidores no
+ *     alcanzan 127.0.0.1. En producción con APP_URL configurado funciona correctamente.
  *
  * Query params:
  *   result  = win | lose | draw
- *   score   = "3-1"   (goles A-B)
+ *   score   = "3-1"
  *   map     = nombre del mapa (opcional)
  */
 app.get('/share', (req, res) => {
     const result = ['win', 'lose', 'draw'].includes(req.query.result) ? req.query.result : 'win';
-    const score  = /^\d+-\d+$/.test(req.query.score ?? '') ? req.query.score : '3–1';
-    const map    = req.query.map || 'TileKick';
+    const score  = /^\d+-\d+$/.test(req.query.score ?? '') ? req.query.score : '3-1';
+    const map    = (req.query.map || 'TileKick').slice(0, 80); // sanitize length
 
-    const appUrl  = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const imgPath = `/assets/img/share/${result}.png`;
-    const imgUrl  = `${appUrl}${imgPath}`;
+    const appUrl  = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+    const imgUrl  = `${appUrl}/assets/img/share/${result}.png`;
+    const pageUrl = `${appUrl}/share?result=${result}&score=${encodeURIComponent(score)}&map=${encodeURIComponent(map)}`;
+    const homeUrl = `${appUrl}/`;
 
-    const titles  = { win: '¡VICTORIA! 🏆', lose: '¡DERROTA! 😔', draw: '¡EMPATE! 🤝' };
-    const title   = titles[result];
-    const desc    = `Resultado: ${score} · ${map} · ¿Me retas a TileKick? 🎮⚽`;
-    const gameUrl = `${appUrl}/`;
+    const scoreDisplay = score.replace('-', '–'); // guión largo para mejor tipografía
+    const titles = {
+        win:  `🏆 ¡VICTORIA en TileKick! ${scoreDisplay}`,
+        lose: `😤 Caída táctica en TileKick — ${scoreDisplay}`,
+        draw: `🤝 ¡Empate épico en TileKick! ${scoreDisplay}`,
+    };
+    const descs = {
+        win:  `Gané ${scoreDisplay} en ${map}. ¿Me retas a TileKick? El fútbol táctico que no sabías que necesitabas. ⚽🎮`,
+        lose: `Perdí ${scoreDisplay} en ${map} pero vuelvo más fuerte. ¿Tú puedes ganarme? ⚽🎮`,
+        draw: `Empate ${scoreDisplay} en ${map}. Ninguno cedió. ¿Rompes tú el empate? ⚽🎮`,
+    };
 
-    // Devuelve HTML minimalista con las meta OG correctas y redirige al inicio.
-    // Los bots (Facebook, Twitter) solo leen las metas; el usuario ve la redirección.
+    const title = titles[result];
+    const desc  = descs[result];
+
+    const fbAppId = process.env.FACEBOOK_APP_ID || '';
+
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // Cache 5 min — los bots pueden volver a scrapearlo si cambia
+    res.setHeader('Cache-Control', 'public, max-age=300');
     res.send(`<!DOCTYPE html>
-<html lang="es">
+<html lang="es" prefix="og: https://ogp.me/ns#">
 <head>
   <meta charset="UTF-8">
   <title>${title} — TileKick</title>
 
-  <!-- Open Graph (Facebook, WhatsApp, LinkedIn…) -->
-  <meta property="og:type"        content="website">
-  <meta property="og:site_name"   content="TileKick">
-  <meta property="og:url"         content="${appUrl}/share?result=${result}&score=${encodeURIComponent(score)}&map=${encodeURIComponent(map)}">
-  <meta property="og:title"       content="${title} — TileKick">
-  <meta property="og:description" content="${desc}">
-  <meta property="og:image"       content="${imgUrl}">
+  <!-- Open Graph — Facebook, WhatsApp, Telegram, LinkedIn -->
+  <meta property="og:type"         content="website">
+  <meta property="og:site_name"    content="TileKick">
+  <meta property="og:locale"       content="es_ES">
+  <meta property="og:url"          content="${pageUrl}">
+  <meta property="og:title"        content="${title} — TileKick">
+  <meta property="og:description"  content="${desc}">
+  <meta property="og:image"        content="${imgUrl}">
   <meta property="og:image:width"  content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt"    content="${title}">
+  ${fbAppId ? `<meta property="fb:app_id" content="${fbAppId}">` : ''}
 
-  <!-- Twitter Card -->
+  <!-- Twitter / X Card -->
   <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:site"        content="@TileKick">
   <meta name="twitter:title"       content="${title} — TileKick">
   <meta name="twitter:description" content="${desc}">
   <meta name="twitter:image"       content="${imgUrl}">
+  <meta name="twitter:image:alt"   content="${title}">
 
-  <!-- Redirigir al home si es un usuario real (los bots no ejecutan JS) -->
-  <script>window.location.replace('${gameUrl}');</script>
+  <!-- Redirigir al home para usuarios reales; los bots no ejecutan JS -->
+  <script>window.location.replace('${homeUrl}');</script>
 </head>
 <body>
-  <p><a href="${gameUrl}">Ir a TileKick</a></p>
+  <p>Redirigiendo a TileKick… <a href="${homeUrl}">Haz clic aquí si no ocurre.</a></p>
 </body>
 </html>`);
 });
