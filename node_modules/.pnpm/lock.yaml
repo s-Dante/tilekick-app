@@ -26,9 +26,6 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
-      jwt:
-        specifier: ^0.2.0
-        version: 0.2.0
       multer:
         specifier: ^2.1.1
         version: 2.1.1
@@ -497,10 +494,6 @@ packages:
   jws@4.0.1:
     resolution: {integrity: sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==}
 
-  jwt@0.2.0:
-    resolution: {integrity: sha512-+lsJgK3p+dr7yCHO19Ap2uFh+pMSCayPRGjWmf3kYCnYfO+1kqz4DqA8s65HKYIrw5c2NBo+dEvzoZUco09j4Q==}
-    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-
   lodash.includes@4.3.0:
     resolution: {integrity: sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==}
 
@@ -593,9 +586,6 @@ packages:
   node-addon-api@8.7.0:
     resolution: {integrity: sha512-9MdFxmkKaOYVTV+XVRG8ArDwwQ77XIgIPyKASB1k3JPq3M8fGQQQE3YpMOrKm6g//Ktx8ivZr8xo1Qmtqub+GA==}
     engines: {node: ^18 || ^20 || >= 21}
-
-  node-base64@0.0.1:
-    resolution: {integrity: sha512-lzWZQXvK7O1g5aKPCTYQJFGJc3MToEMlGmhXN+2UtkRYQz0OiWHoSMkfqQedUYCwWnixvsauH/IFsaFkrspjYQ==}
 
   node-gyp-build@4.8.4:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
@@ -1243,10 +1233,6 @@ snapshots:
       jwa: 2.0.1
       safe-buffer: 5.2.1
 
-  jwt@0.2.0:
-    dependencies:
-      node-base64: 0.0.1
-
   lodash.includes@4.3.0: {}
 
   lodash.isboolean@3.0.3: {}
@@ -1319,8 +1305,6 @@ snapshots:
   negotiator@1.0.0: {}
 
   node-addon-api@8.7.0: {}
-
-  node-base64@0.0.1: {}
 
   node-gyp-build@4.8.4: {}
 
