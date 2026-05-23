@@ -26,8 +26,14 @@ const io = new Server(server);
 
 const port = process.env.PORT || 3000;
 
-const publicDir = path.join(__dirname, '..', 'public');
+const publicDir  = path.join(__dirname, '..', 'public');
 const page = (relativePath) => path.join(publicDir, 'pages', relativePath);
+
+// Storage — en Railway apunta al Volume montado (ej: /data)
+// En local usa ./storage por defecto (sin cambios)
+const storageRoot = process.env.STORAGE_PATH
+    ? path.resolve(process.env.STORAGE_PATH)
+    : path.join(__dirname, '..', 'storage');
 
 const pages = {
     welcome: page('index.html'),
@@ -52,7 +58,7 @@ app.use(cookieParser());
 app.use(express.static(publicDir));
 
 app.use('/engine', express.static(path.join(__dirname, '..', 'engine')));
-app.use('/storage', express.static(path.join(__dirname, '..', 'storage')));
+app.use('/storage', express.static(storageRoot));
 app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
 
 // Multer — solo en memoria, sharp se encarga del disco
@@ -65,30 +71,34 @@ const upload = multer({
     },
 });
 
-const avatarsDir = path.join(__dirname, '..', 'storage', 'avatars');
+const avatarsDir = path.join(storageRoot, 'avatars');
 if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
 
 /**
- * Database
+ * Database — Pool de conexiones
+ * Usa createPool en lugar de createConnection para que Railway (y cualquier
+ * entorno de producción) maneje reconexiones automáticamente sin crashear.
+ * La API db.query() es idéntica, no hay que cambiar nada más.
  */
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
+const db = mysql.createPool({
+    host:     process.env.DB_HOST,
+    port:     parseInt(process.env.DB_PORT) || 3306,
+    user:     process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    waitForConnections: true,
+    connectionLimit:    10,
+    queueLimit:         0,
 });
 
-db.connect((err) => {
+// Verificar conectividad al arrancar (no fatal — el pool reintentará solo)
+db.getConnection((err, connection) => {
     if (err) {
-        console.error('Error al conectar a la base de datos:', err.stack);
+        console.error('[DB] No se pudo conectar al arrancar:', err.message);
         return;
     }
-    console.log('Conectado a la base de datos');
-});
-
-// Manejar errores no fatales de la conexión para evitar que Node crashee
-db.on('error', (err) => {
-    console.error('[DB] Error de conexión:', err.message);
+    console.log('[DB] Conectado a la base de datos');
+    connection.release();
 });
 
 /**
@@ -141,6 +151,9 @@ const requireAuth = (req, res, next) => {
 /**
  * Routes — Públicas
  */
+// Health check — usado por Railway para verificar que el servidor está vivo
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
 app.get('/', (req, res) => {
     res.sendFile(pages.welcome);
 });
@@ -1039,7 +1052,8 @@ app.post('/api/me/avatar', requireAuth, upload.single('avatar'), async (req, res
                 const oldUrl  = rows[0].avatar_url;
                 // Solo borrar si es un archivo local nuestro
                 if (oldUrl.startsWith('/storage/avatars/')) {
-                    const oldPath = path.join(__dirname, '..', oldUrl);
+                    // Construir path real usando storageRoot (funciona local y en Railway Volume)
+                    const oldPath = path.join(storageRoot, oldUrl.replace(/^\/storage/, ''));
                     fs.unlink(oldPath, () => {});   // Silencioso si ya no existe
                 }
             }

@@ -1,0 +1,14 @@
+# Nixpacks build config for Railway
+# Docs: https://nixpacks.com/docs/configuration/file
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = [
+  "npm install -g pnpm@10",
+  "pnpm install --frozen-lockfile"
+]
+
+[start]
+cmd = "node server/app.js"
