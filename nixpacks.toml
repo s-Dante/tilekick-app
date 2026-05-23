@@ -1,12 +1,9 @@
 # Nixpacks build config for Railway
-# Docs: https://nixpacks.com/docs/configuration/file
+# Nixpacks detecta pnpm automáticamente desde pnpm-lock.yaml.
+# Solo especificamos la versión de Node y el comando de inicio.
 
 [phases.setup]
 nixPkgs = ["nodejs_20"]
-
-[phases.install]
-# Instalar pnpm y usarlo en el mismo comando (mismo shell, mismo PATH)
-cmds = ["npm install -g pnpm@10 && pnpm install --frozen-lockfile"]
 
 [start]
 cmd = "node server/app.js"
