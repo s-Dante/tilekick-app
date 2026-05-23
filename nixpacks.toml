@@ -5,10 +5,8 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = [
-  "npm install -g pnpm@10",
-  "pnpm install --frozen-lockfile"
-]
+# Instalar pnpm y usarlo en el mismo comando (mismo shell, mismo PATH)
+cmds = ["npm install -g pnpm@10 && pnpm install --frozen-lockfile"]
 
 [start]
 cmd = "node server/app.js"
