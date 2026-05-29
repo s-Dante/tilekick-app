@@ -3,10 +3,7 @@
 # Solo especificamos la versión de Node y el comando de inicio.
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "git-lfs"]
-
-[phases.build]
-cmds = ["git lfs pull"]
+nixPkgs = ["nodejs_20"]
 
 [start]
 cmd = "node server/app.js"
